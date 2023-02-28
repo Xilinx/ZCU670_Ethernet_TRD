@@ -21,7 +21,7 @@ Contents:
    :caption: Versions
    :hidden:
    
-   Master (2022.2) <https://pages.gitenterprise.xilinx.com/SIV-HW-APPS/zcu670-ethernet-trd/2022.2/docs/build/html/index.html>
+   Master (2022.2) <https://xilinx.github.io/ZCU670_Ethernet_TRD/2022.2/docs/build/html/index.html>
                     
 
    versions
