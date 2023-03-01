@@ -149,7 +149,7 @@ By default the interface links up at **25G**.
    ```     
 	Board-1 > ptp4l -i <interface-name> -f  /usr/bin/linkpartner_G.8275.1.cfg -m
    ```
-The ptp4l master side log is shown below :
+**ptp4l master side log** :
 	
    ``` 
 	ptp4l[422.355]: selected /dev/ptp1 as PTP clock
@@ -166,14 +166,14 @@ The ptp4l master side log is shown below :
    ``` 
     Board-2 > ts2phc -m -c <interface-name> -s /dev/ptp0 -f /usr/bin/ts2phc.cfg &
    ``` 
-The ts2phc log is shown below:	
+**ts2phc log** :	
 	
    ``` 
 	PTP_PIN_SETFUNC2 failed: Invalid argument
 	ts2phc[521.912]: Failed to set the pin. Continuing bravely on...
    ``` 
 
-> * Note: This message can be ignored because the Renesas ClockMatrix PHC driver does not support dynamic PTP_PIN_SETFUNC. For more details refer [Renesas Phase Adjust quick start manual](https://www.renesas.com/us/en/document/mas/linux-ptp-using-phc-adjust-phase-quick-start-manual) or Use -l option.
+> * **Note: This message can be ignored because the Renesas ClockMatrix PHC driver does not support dynamic PTP_PIN_SETFUNC. For more details refer [Renesas Phase Adjust quick start manual](https://www.renesas.com/us/en/document/mas/linux-ptp-using-phc-adjust-phase-quick-start-manual) or Use -l option.**
    
    * Run ptp4l in slave mode:
 
@@ -183,7 +183,7 @@ The ts2phc log is shown below:
 	Board-2 > ptp4l -m -q -p /dev/ptp0 -s -f /usr/bin/standalone_G.8275.1.cfg
    ```     
 
-The ptp4l phase synchronization log is shown below :	
+   **ptp4l phase synchronization log** :	
 
    ``` 
 	ptp4l[530.543]: selected /dev/ptp0 as PTP clock
@@ -209,7 +209,7 @@ The ptp4l phase synchronization log is shown below :
 
 ### Frequency Synchronization
 
-> * Note: Before running frequency syncronization kill all instance of ts2phc running background.
+> * **Note: Before running frequency syncronization kill all instance of ts2phc running background.**
 
 * Run ptp4l in master mode:
   ``` 
@@ -218,7 +218,7 @@ The ptp4l phase synchronization log is shown below :
   or vice versa
   ``` 
  
-The ptp4l master side log is shown below:
+**ptp4l master side log**:
    ```
 	ptp4l[6195.490]: selected /dev/ptp1 as PTP clock
 	ptp4l[6195.491]: port 1: INITIALIZING to LISTENING on INIT_COMPLETE
@@ -234,7 +234,7 @@ The ptp4l master side log is shown below:
 	
 	or vice versa
    ```
-The ptp4l frequency synchronization slave side log is shown below:
+**ptp4l frequency synchronization slave side log**:
    ```
     ptp4l[6276.202]: selected /dev/ptp1 as PTP clock
 	ptp4l[6276.203]: port 1: INITIALIZING to LISTENING on INIT_COMPLETE
@@ -259,9 +259,9 @@ The ptp4l frequency synchronization slave side log is shown below:
    
 ## Iperf Commands
 
-> * Note: Make sure to apply taskset to appropriate CPU core while running iperf traffic as shown in below commands.
+> * **Note: Make sure to apply taskset to appropriate CPU core while running iperf traffic as shown in below commands.**
 
-> * While running iperf traffic and ptp4l parallely, run either of the one in background.
+> * While running iperf traffic and ptp4l simultaneously, run either of the one in background.
 
 
 **TCP TX** 

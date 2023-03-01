@@ -15,9 +15,7 @@ Hardware Architecture of the Platform
 
 Introduction
 ---------------
- This section describes the hardware architecture of the design implemented on the ZCU670 board.
-
- The following figure shows the top level hardware architecture of the reference design. The details of various components used in the platform is described in the following section.
+ This section describes the hardware architecture of the design implemented on the ZCU670 board. The following figure shows the top level hardware architecture of the reference design. The details of various components used in the platform is described in the following section.
 
 ![](../../media/Hardware_system_Block_Diagram.PNG)
 
@@ -69,13 +67,13 @@ The following is the packet flow for the normal Ethernet packets in both directi
 	
   o The AXI MCDMA writes this data onto the memory.
   
-For the PTP Packets, the PL based PTP Packet processors are used in both Transmit and Receive directions.
+* For the PTP Packets, the PL based PTP Packet processors are used in both Transmit and Receive directions.
 
-In the Transmit direction, the PTP Packet processor is present between AXI MCDMA control stream and XXV MAC Tx interfaces.
+* In the Transmit direction, the PTP Packet processor is present between AXI MCDMA control stream and XXV MAC Tx interfaces.
 
-In the Receive direction, the PTP Packet processor is present between XXV MAC Rx and AXI MCDMA S2MM interfaces.
+* In the Receive direction, the PTP Packet processor is present between XXV MAC Rx and AXI MCDMA S2MM interfaces.
 
-Further details on the PTP Packet processors can be found in this page. [Hardware Architecture of the PTP Packet Processor](hw_arch_ptp_pkt_proc.md)
+* Further details on the PTP Packet processors can be found in this page. [Hardware Architecture of the PTP Packet Processor](hw_arch_ptp_pkt_proc.md)
 
 
 Resource Utilization

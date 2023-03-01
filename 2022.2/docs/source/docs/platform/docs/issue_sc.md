@@ -12,7 +12,7 @@
 
 Known Issues
 ============
-* In MTU 9000 UDP RX usecase, PTP phase and frequency sync may go out of sync when iperf traffic and ptp4l are run parallely.  
+* In MTU 9000 UDP RX usecase, PTP phase and frequency sync may go out of sync due to high CPU utilization, when iperf traffic and ptp4l are run simultaneously .  
 
 
 **License**

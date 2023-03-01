@@ -113,8 +113,7 @@ function OptanonWrapper() { }
 <h1>Hardware Architecture of the Platform<a class="headerlink" href="#hardware-architecture-of-the-platform" title="Permalink to this heading">¶</a></h1>
 <div class="section" id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">¶</a></h2>
-<p>This section describes the hardware architecture of the design implemented on the ZCU670 board.</p>
-<p>The following figure shows the top level hardware architecture of the reference design. The details of various components used in the platform is described in the following section.</p>
+<p>This section describes the hardware architecture of the design implemented on the ZCU670 board. The following figure shows the top level hardware architecture of the reference design. The details of various components used in the platform is described in the following section.</p>
 <p><img alt="../../../_images/Hardware_system_Block_Diagram.PNG" src="../../../_images/Hardware_system_Block_Diagram.PNG" /></p>
 <ul>
 <li><p>Processor Subsystem (PS):
@@ -152,11 +151,11 @@ This contains the following main IP:</p>
 <p>o The XXV MAC sends this data via the streaming interface to the S2MM port of AXI MCDMA.</p>
 <p>o The AXI MCDMA writes this data onto the memory.</p>
 </li>
+<li><p>For the PTP Packets, the PL based PTP Packet processors are used in both Transmit and Receive directions.</p></li>
+<li><p>In the Transmit direction, the PTP Packet processor is present between AXI MCDMA control stream and XXV MAC Tx interfaces.</p></li>
+<li><p>In the Receive direction, the PTP Packet processor is present between XXV MAC Rx and AXI MCDMA S2MM interfaces.</p></li>
+<li><p>Further details on the PTP Packet processors can be found in this page. <a class="reference internal" href="hw_arch_ptp_pkt_proc.html"><span class="doc">Hardware Architecture of the PTP Packet Processor</span></a></p></li>
 </ul>
-<p>For the PTP Packets, the PL based PTP Packet processors are used in both Transmit and Receive directions.</p>
-<p>In the Transmit direction, the PTP Packet processor is present between AXI MCDMA control stream and XXV MAC Tx interfaces.</p>
-<p>In the Receive direction, the PTP Packet processor is present between XXV MAC Rx and AXI MCDMA S2MM interfaces.</p>
-<p>Further details on the PTP Packet processors can be found in this page. <a class="reference internal" href="hw_arch_ptp_pkt_proc.html"><span class="doc">Hardware Architecture of the PTP Packet Processor</span></a></p>
 </div>
 <div class="section" id="resource-utilization">
 <h2>Resource Utilization<a class="headerlink" href="#resource-utilization" title="Permalink to this heading">¶</a></h2>
@@ -196,7 +195,7 @@ This contains the following main IP:</p>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on February 28, 2023.
+      <span class="lastupdated">Last updated on March 01, 2023.
       </span></p>
   </div>
 

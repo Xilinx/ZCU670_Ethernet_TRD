@@ -107,7 +107,7 @@ function OptanonWrapper() { }
 </table><div class="section" id="known-issues">
 <h1>Known Issues<a class="headerlink" href="#known-issues" title="Permalink to this heading">¶</a></h1>
 <ul class="simple">
-<li><p>In MTU 9000 UDP RX usecase, PTP phase and frequency sync may go out of sync when iperf traffic and ptp4l are run parallely.</p></li>
+<li><p>In MTU 9000 UDP RX usecase, PTP phase and frequency sync may go out of sync due to high CPU utilization, when iperf traffic and ptp4l are run simultaneously .</p></li>
 </ul>
 <p><strong>License</strong></p>
 <p>Licensed under the Apache License, Version 2.0 (the “License”); you may not use this file except in compliance with the License.</p>
@@ -138,7 +138,7 @@ function OptanonWrapper() { }
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on February 28, 2023.
+      <span class="lastupdated">Last updated on March 01, 2023.
       </span></p>
   </div>
 

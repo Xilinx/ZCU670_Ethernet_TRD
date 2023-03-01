@@ -59,7 +59,7 @@ function OptanonWrapper() { }
 <li class="toctree-l3"><a class="reference internal" href="hw_arch_platform.html">Hardware Architecture of the Platform</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Hardware Architecture of the PTP Packet Processor</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#ptp-tx-hw-master-ip">PTP Tx HW MASTER IP</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#rx-ptp-packet-detect-logic-ip">Rx PTP PACKET DETECT LOGIC IP</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#rx-ptp-packet-detect-and-prepend-logic-rx-hardware-master">Rx PTP PACKET DETECT and PREPEND LOGIC (RX Hardware Master)</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="sw_arch_platform.html">Software Architecture of the Platform</a></li>
@@ -144,12 +144,13 @@ MRMAC performs the PTP operation based on the 2 bit value of tx_ptp_1588op_in[1:
 </ul>
 <p>When the ptp flag value is “10”, the PTP HW Master initiates a memory write operation of the timestamp value. The timestamp value is written into the memory via NoC. The PTP HW Master makes the final bit 1 (qualifier bit) to indicate the memory write completion to Software.</p>
 </div>
-<div class="section" id="rx-ptp-packet-detect-logic-ip">
-<h2>Rx PTP PACKET DETECT LOGIC IP<a class="headerlink" href="#rx-ptp-packet-detect-logic-ip" title="Permalink to this heading">¶</a></h2>
-<p>PTP Packet Detection IP parses all the received Packets.</p>
-<p>o When a PTP packet is received, it parses the Header and sets a PTP Qualifier bit (i) when a PTP packet is detected, that helps the PTP application in upper layer for further processing.</p>
-<p>o An additional Qualifier bit is set, when a Peer-to-Peer PTP packet(ii) is detected.</p>
-<p>o Timestamp prepend logic prepends two 64 bit Datawords (128 bit) to all the received packets, which has 80 bit Timestamp information and the status of the Qualifier bits. Below table has the details of prepended datawords.</p>
+<div class="section" id="rx-ptp-packet-detect-and-prepend-logic-rx-hardware-master">
+<h2>Rx PTP PACKET DETECT and PREPEND LOGIC (RX Hardware Master)<a class="headerlink" href="#rx-ptp-packet-detect-and-prepend-logic-rx-hardware-master" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>PTP Packet Detection IP parses all the received Packets.</p></li>
+<li><p>When a PTP packet is received, it parses the Header and sets a PTP Qualifier bit (i) when a PTP packet is detected, that helps the PTP application in upper layer for further processing.</p></li>
+<li><p>Timestamp prepend logic prepends two 64 bit Datawords (128 bit) to all the received packets, which has 80 bit Timestamp information and the status of the Qualifier bit. Below table has the details of prepended datawords.</p></li>
+</ul>
 <table border="1" class="docutils">
 <thead>
 <tr>
@@ -159,12 +160,12 @@ MRMAC performs the PTP operation based on the 2 bit value of tx_ptp_1588op_in[1:
 </thead>
 <tbody>
 <tr>
-<td>Prepended DW-0</td>
+<td>Prepended DW_0</td>
 <td>63 : 0      -    Timestamp[63:0]</td>
 </tr>
 <tr>
-<td>Prepended DW-1</td>
-<td>15 : 0      -    Timestamp[79:64] <div>29 : 16    -    Reserved</div><div>30         -    Peer-to-Peer PTP  Packet Qualifier bit</div><div>31         -    PTP Packet Qualifier bit</div><div>63 : 32    -    Reserved</div></td>
+<td>Prepended DW_1</td>
+<td>15 : 0      -    Timestamp[79:64] <div>30 : 16    -    Reserved</div><div>31         -    PTP Packet Qualifier bit</div><div>63 : 32    -    Reserved</div></td>
 </tr>
 <tr>
 <td>DW-2</td>
@@ -172,12 +173,12 @@ MRMAC performs the PTP operation based on the 2 bit value of tx_ptp_1588op_in[1:
 </tr>
 </tbody>
 </table><p><strong>Supported Features:</strong></p>
-<p>o PTP Packet over IEEEE 802.3</p>
-<p>o PTP Packet over UDP IPV4 – Version 1 and Version 2</p>
-<p>o Two step PTP</p>
-<p>The PTP detect logic checks the Type field of the received packet whenever a new ethernet packet is received and also checks for the multicast IP destination address for UDP IPV4 Packets, to carry out the PTP detection.</p>
-<p>(i) PTP Packet Qualifier bit - DW1[31]</p>
-<p>(ii) Peer-to-Peer PTP Packet Qualifier bit - DW1[30]</p>
+<ul class="simple">
+<li><p>PTP Packet over IEEEE 802.3</p></li>
+<li><p>PTP Packet over UDP IPV4 – Version 1 and Version 2</p></li>
+<li><p>Two step PTP</p></li>
+</ul>
+<p>The PTP detect logic checks the Type field of the received packet whenever a new ethernet packet is received and also checks for the multicast IP destination address for UDP IPV4 Packets, to carry out the PTP detection and sets the PTP Packet Qualifier bit - DW_1[31]</p>
 <p><strong>Next Steps</strong></p>
 <ul class="simple">
 <li><p>Go to the <a class="reference internal" href="sw_arch_platform.html"><span class="doc">SW Architecture Platform page</span></a></p></li>
@@ -213,7 +214,7 @@ MRMAC performs the PTP operation based on the 2 bit value of tx_ptp_1588op_in[1:
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on February 28, 2023.
+      <span class="lastupdated">Last updated on March 01, 2023.
       </span></p>
   </div>
 

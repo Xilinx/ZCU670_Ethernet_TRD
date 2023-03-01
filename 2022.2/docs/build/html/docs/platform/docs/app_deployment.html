@@ -238,7 +238,7 @@ function OptanonWrapper() { }
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">Board</span><span class="o">-</span><span class="mi">1</span> <span class="o">&gt;</span> <span class="n">ptp4l</span> <span class="o">-</span><span class="n">i</span> <span class="o">&lt;</span><span class="n">interface</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;</span> <span class="o">-</span><span class="n">f</span>  <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">linkpartner_G</span><span class="mf">.8275.1</span><span class="o">.</span><span class="n">cfg</span> <span class="o">-</span><span class="n">m</span>
 </pre></div>
 </div>
-<p>The ptp4l master side log is shown below :</p>
+<p><strong>ptp4l master side log</strong> :</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">ptp4l</span><span class="p">[</span><span class="mf">422.355</span><span class="p">]:</span> <span class="n">selected</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">ptp1</span> <span class="k">as</span> <span class="n">PTP</span> <span class="n">clock</span>
  <span class="n">xilinx</span><span class="o">-</span><span class="n">zcu670</span><span class="o">-</span><span class="mi">20222</span><span class="p">:</span><span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">petalinux</span><span class="c1"># ptp4l[422.392]: port 1: INITIALIZING to LISTENING on INIT_COMPLETE</span>
  <span class="n">ptp4l</span><span class="p">[</span><span class="mf">422.392</span><span class="p">]:</span> <span class="n">port</span> <span class="mi">0</span><span class="p">:</span> <span class="n">INITIALIZING</span> <span class="n">to</span> <span class="n">LISTENING</span> <span class="n">on</span> <span class="n">INIT_COMPLETE</span>
@@ -254,14 +254,14 @@ function OptanonWrapper() { }
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">Board</span><span class="o">-</span><span class="mi">2</span> <span class="o">&gt;</span> <span class="n">ts2phc</span> <span class="o">-</span><span class="n">m</span> <span class="o">-</span><span class="n">c</span> <span class="o">&lt;</span><span class="n">interface</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;</span> <span class="o">-</span><span class="n">s</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">ptp0</span> <span class="o">-</span><span class="n">f</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">ts2phc</span><span class="o">.</span><span class="n">cfg</span> <span class="o">&amp;</span>
 </pre></div>
 </div>
-<p>The ts2phc log is shown below:</p>
+<p><strong>ts2phc log</strong> :</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">PTP_PIN_SETFUNC2</span> <span class="n">failed</span><span class="p">:</span> <span class="n">Invalid</span> <span class="n">argument</span>
  <span class="n">ts2phc</span><span class="p">[</span><span class="mf">521.912</span><span class="p">]:</span> <span class="n">Failed</span> <span class="n">to</span> <span class="nb">set</span> <span class="n">the</span> <span class="n">pin</span><span class="o">.</span> <span class="n">Continuing</span> <span class="n">bravely</span> <span class="n">on</span><span class="o">...</span>
 </pre></div>
 </div>
 <blockquote>
 <div><ul class="simple">
-<li><p>Note: This message can be ignored because the Renesas ClockMatrix PHC driver does not support dynamic PTP_PIN_SETFUNC. For more details refer <a class="reference external" href="https://www.renesas.com/us/en/document/mas/linux-ptp-using-phc-adjust-phase-quick-start-manual">Renesas Phase Adjust quick start manual</a> or Use -l option.</p></li>
+<li><p><strong>Note: This message can be ignored because the Renesas ClockMatrix PHC driver does not support dynamic PTP_PIN_SETFUNC. For more details refer <a class="reference external" href="https://www.renesas.com/us/en/document/mas/linux-ptp-using-phc-adjust-phase-quick-start-manual">Renesas Phase Adjust quick start manual</a> or Use -l option.</strong></p></li>
 </ul>
 </div></blockquote>
 <ul class="simple">
@@ -275,7 +275,7 @@ function OptanonWrapper() { }
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">Board</span><span class="o">-</span><span class="mi">2</span> <span class="o">&gt;</span> <span class="n">ptp4l</span> <span class="o">-</span><span class="n">m</span> <span class="o">-</span><span class="n">q</span> <span class="o">-</span><span class="n">p</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">ptp0</span> <span class="o">-</span><span class="n">s</span> <span class="o">-</span><span class="n">f</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">standalone_G</span><span class="mf">.8275.1</span><span class="o">.</span><span class="n">cfg</span>
 </pre></div>
 </div>
-<p>The ptp4l phase synchronization log is shown below :</p>
+<p><strong>ptp4l phase synchronization log</strong> :</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">ptp4l</span><span class="p">[</span><span class="mf">530.543</span><span class="p">]:</span> <span class="n">selected</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">ptp0</span> <span class="k">as</span> <span class="n">PTP</span> <span class="n">clock</span>
  <span class="n">ptp4l</span><span class="p">[</span><span class="mf">530.546</span><span class="p">]:</span> <span class="n">port</span> <span class="mi">1</span><span class="p">:</span> <span class="n">taking</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">ptp0</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">command</span> <span class="n">line</span><span class="p">,</span> <span class="ow">not</span> <span class="n">the</span> <span class="n">attached</span> <span class="n">ptp1</span>
  <span class="n">xilinx</span><span class="o">-</span><span class="n">zcu670</span><span class="o">-</span><span class="mi">20222</span><span class="p">:</span><span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">petalinux</span><span class="c1"># ptp4l[530.588]: port 1: INITIALIZING to LISTENING on INIT_COMPLETE</span>
@@ -302,7 +302,7 @@ function OptanonWrapper() { }
 <h3>Frequency Synchronization<a class="headerlink" href="#frequency-synchronization" title="Permalink to this heading">¶</a></h3>
 <blockquote>
 <div><ul class="simple">
-<li><p>Note: Before running frequency syncronization kill all instance of ts2phc running background.</p></li>
+<li><p><strong>Note: Before running frequency syncronization kill all instance of ts2phc running background.</strong></p></li>
 </ul>
 </div></blockquote>
 <ul>
@@ -314,7 +314,7 @@ function OptanonWrapper() { }
 </div>
 </li>
 </ul>
-<p>The ptp4l master side log is shown below:</p>
+<p><strong>ptp4l master side log</strong>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">ptp4l</span><span class="p">[</span><span class="mf">6195.490</span><span class="p">]:</span> <span class="n">selected</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">ptp1</span> <span class="k">as</span> <span class="n">PTP</span> <span class="n">clock</span>
  <span class="n">ptp4l</span><span class="p">[</span><span class="mf">6195.491</span><span class="p">]:</span> <span class="n">port</span> <span class="mi">1</span><span class="p">:</span> <span class="n">INITIALIZING</span> <span class="n">to</span> <span class="n">LISTENING</span> <span class="n">on</span> <span class="n">INIT_COMPLETE</span>
  <span class="n">ptp4l</span><span class="p">[</span><span class="mf">6195.492</span><span class="p">]:</span> <span class="n">port</span> <span class="mi">0</span><span class="p">:</span> <span class="n">INITIALIZING</span> <span class="n">to</span> <span class="n">LISTENING</span> <span class="n">on</span> <span class="n">INIT_COMPLETE</span>
@@ -332,7 +332,7 @@ function OptanonWrapper() { }
 </div>
 </li>
 </ul>
-<p>The ptp4l frequency synchronization slave side log is shown below:</p>
+<p><strong>ptp4l frequency synchronization slave side log</strong>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="n">ptp4l</span><span class="p">[</span><span class="mf">6276.202</span><span class="p">]:</span> <span class="n">selected</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">ptp1</span> <span class="k">as</span> <span class="n">PTP</span> <span class="n">clock</span>
  <span class="n">ptp4l</span><span class="p">[</span><span class="mf">6276.203</span><span class="p">]:</span> <span class="n">port</span> <span class="mi">1</span><span class="p">:</span> <span class="n">INITIALIZING</span> <span class="n">to</span> <span class="n">LISTENING</span> <span class="n">on</span> <span class="n">INIT_COMPLETE</span>
  <span class="n">ptp4l</span><span class="p">[</span><span class="mf">6276.204</span><span class="p">]:</span> <span class="n">port</span> <span class="mi">0</span><span class="p">:</span> <span class="n">INITIALIZING</span> <span class="n">to</span> <span class="n">LISTENING</span> <span class="n">on</span> <span class="n">INIT_COMPLETE</span>
@@ -360,12 +360,12 @@ function OptanonWrapper() { }
 <h2>Iperf Commands<a class="headerlink" href="#iperf-commands" title="Permalink to this heading">¶</a></h2>
 <blockquote>
 <div><ul class="simple">
-<li><p>Note: Make sure to apply taskset to appropriate CPU core while running iperf traffic as shown in below commands.</p></li>
+<li><p><strong>Note: Make sure to apply taskset to appropriate CPU core while running iperf traffic as shown in below commands.</strong></p></li>
 </ul>
 </div></blockquote>
 <blockquote>
 <div><ul class="simple">
-<li><p>While running iperf traffic and ptp4l parallely, run either of the one in background.</p></li>
+<li><p>While running iperf traffic and ptp4l simultaneously, run either of the one in background.</p></li>
 </ul>
 </div></blockquote>
 <p><strong>TCP TX</strong></p>
@@ -499,7 +499,7 @@ function OptanonWrapper() { }
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on February 28, 2023.
+      <span class="lastupdated">Last updated on March 01, 2023.
       </span></p>
   </div>
 
