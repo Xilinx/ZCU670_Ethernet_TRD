@@ -256,6 +256,7 @@ By default the interface links up at **25G**.
 	ptp4l[6294.829]: master offset         -3 s2 freq    -154 path delay        74
 	ptp4l[6295.829]: master offset         -1 s2 freq    -153 path delay        73
    ```
+> * **Note: For more details refer [Linux PTP Project source files and Documentation](https://linuxptp.sourceforge.net/)**
    
 ## Iperf Commands
 

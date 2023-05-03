@@ -1,12 +1,11 @@
 ZCU670 Ethernet TRD
 ===========================================================
-The ZCU670-IEEE1588 Ethernet TRD demonstrates the capability of ZCU670 evaluation board to synchronize time, frequency, and phase of Physical Hardware clocks (PHC) connected to a packet network that support IEEE 1588 Precision Time Protocol (PTP) protocol. The PHC (Xilinx Timer-Syncer) of the ZCU670 board is synchronized to the PHC of the link partner that supports telecom profile (an another zcu670 Board2 in this case) using PTP packets. The AXI 25G XXV MAC ethernet subsystem along with the PTP inline packet processors present in the Programmable logic (PL) of FPGA guarantees PTP frequency and phase synchronization while serving TCP/UPD traffic of other applications. 
+The ZCU670-IEEE1588 Ethernet TRD demonstrates the capability of ZCU670 evaluation board to synchronize time, frequency, and phase of Physical Hardware clocks (PHC) connected to a packet network that support IEEE 1588 Precision Time Protocol (PTP) protocol. The PHC (Xilinx Timer-Syncer) of the ZCU670 board is synchronized to the PHC of the link partner (an another zcu670 Board2 in this case) using PTP packets. The AXI 25G XXV MAC ethernet subsystem along with the PTP inline packet processors present in the Programmable logic (PL) of FPGA guarantees PTP frequency and phase synchronization while serving TCP/UPD traffic of other applications. 
 
   
 Features
 --------
- 
-* PTP Telecom Profiles for Time and Phase (ITU-T G.8275.1 profile)
+
 * 25G support 
 * Two step Precision Time Protocol (PTP)
 * PTP packet over IEEEE 802.3

@@ -22,6 +22,8 @@ This tutorial explains the steps to build the hardware design and software image
 * Vivado Design Suite 2022.2
 * PetaLinux 2022.2 tools
 
+> * **Note: After sourcing the Vivado tool open `../.Xilinx/Vivado/Vivado_init.tcl` and add `enable_beta_device` command into it to enable all beta devices**
+
 To Build the TRD Package with the top Makefile:
 ---------------------------------------------------
 
