@@ -1,6 +1,6 @@
 <table class="sphinxhide">
  <tr>
-   <td align="center"><img src="https://raw.githubusercontent.com/Xilinx/Image-Collateral/main/xilinx-logo.png" width="30%"/><h1> Zynq UltraScale+ RFSOC DFE - ZCU670 Ethernet Targeted Reference Design </h1>
+   <td align="center"><img src="https://raw.githubusercontent.com/Xilinx/Image-Collateral/main/xilinx-logo.png" width="30%"/><h1> Zynq UltraScale+ RFSOC ZCU670 Ethernet + IEEE 1588 PTP Targeted Reference Design </h1>
    </td>
  </tr>
 </table>
