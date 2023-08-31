@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
 <!-- OneTrust Cookies Consent Notice start for xilinx.github.io -->
@@ -19,11 +20,9 @@ function OptanonWrapper() { }
     <script src="../../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
-        <script src="../../../_static/jquery.js"></script>
-        <script src="../../../_static/underscore.js"></script>
-        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/documentation_options.js?v=13fe7e93"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
@@ -37,7 +36,6 @@ function OptanonWrapper() { }
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search">
             <a href="../../../index.html" class="icon icon-home"> ZCU670 Ethernet TRD
-            <img src="../../../_static/xilinx-header-logo.svg" class="logo" alt="Logo"/>
           </a>
               <div class="version">
                 1.0
@@ -104,17 +102,17 @@ function OptanonWrapper() { }
              
   <table class="sphinxhide">
  <tr>
-   <td align="center"><img src="media/xilinx-logo.png" width="30%"/><h1> RFSoC-ZCU670 Evaluation Kit Tutorial</h1>
+   <td align="center"><img src="media/xilinx-logo.png" width="30%"/><h1> ZCU670 Evaluation Kit Tutorial</h1>
    </td>
  </tr>
  <tr>
  <td align="center"><h1>Using Vivado to Build the Hardware Design and petalinux images</h1> </td>
  </tr>
-</table><div class="section" id="build-flow">
-<h1>Build Flow<a class="headerlink" href="#build-flow" title="Permalink to this heading">¶</a></h1>
+</table><section id="build-flow">
+<h1>Build Flow<a class="headerlink" href="#build-flow" title="Link to this heading">¶</a></h1>
 <p>This tutorial explains the steps to build the hardware design and software images from the TRD source package.</p>
-<div class="section" id="prerequisites">
-<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h2>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>Vivado Design Suite 2022.2</p></li>
 <li><p>PetaLinux 2022.2 tools</p></li>
@@ -124,9 +122,9 @@ function OptanonWrapper() { }
 <li><p><strong>Note: After sourcing the Vivado tool open <code class="docutils literal notranslate"><span class="pre">../.Xilinx/Vivado/Vivado_init.tcl</span></code> and add <code class="docutils literal notranslate"><span class="pre">enable_beta_device</span></code> command into it to enable all beta devices</strong></p></li>
 </ul>
 </div></blockquote>
-</div>
-<div class="section" id="to-build-the-trd-package-with-the-top-makefile">
-<h2>To Build the TRD Package with the top Makefile:<a class="headerlink" href="#to-build-the-trd-package-with-the-top-makefile" title="Permalink to this heading">¶</a></h2>
+</section>
+<section id="to-build-the-trd-package-with-the-top-makefile">
+<h2>To Build the TRD Package with the top Makefile:<a class="headerlink" href="#to-build-the-trd-package-with-the-top-makefile" title="Link to this heading">¶</a></h2>
 <p>Follow the below steps to generate petalinux images using the top Makefile in <strong><code class="docutils literal notranslate"><span class="pre">../zcu670-ethernet-trd-2022.2/Makefile</span></code></strong> path.</p>
 <ol>
 <li><p>Go to the working directory</p>
@@ -141,9 +139,9 @@ function OptanonWrapper() { }
 </div>
 </li>
 </ol>
-</div>
-<div class="section" id="to-build-the-hardware-platform-xsa">
-<h2>To Build the Hardware Platform XSA:<a class="headerlink" href="#to-build-the-hardware-platform-xsa" title="Permalink to this heading">¶</a></h2>
+</section>
+<section id="to-build-the-hardware-platform-xsa">
+<h2>To Build the Hardware Platform XSA:<a class="headerlink" href="#to-build-the-hardware-platform-xsa" title="Link to this heading">¶</a></h2>
 <p>Follow the steps below to build XSA using the Makefile in <strong><code class="docutils literal notranslate"><span class="pre">../zcu670-ethernet-trd-2022.2/vivado/Makefile</span></code></strong> path.</p>
 <ol>
 <li><p>Go to the platform directory.</p>
@@ -162,9 +160,9 @@ function OptanonWrapper() { }
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="o">../</span><span class="n">zcu670</span><span class="o">-</span><span class="n">ethernet</span><span class="o">-</span><span class="n">trd</span><span class="o">-</span><span class="mf">2022.2</span><span class="o">/</span><span class="n">vivado</span><span class="o">/</span><span class="n">zcu670_25G_PTP_subsys</span><span class="o">/</span><span class="n">project</span><span class="o">/</span><span class="n">xxv_ptp_subsys_wrapper</span><span class="o">.</span><span class="n">xsa</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="to-build-the-petalinux-images">
-<h2>To Build the Petalinux Images:<a class="headerlink" href="#to-build-the-petalinux-images" title="Permalink to this heading">¶</a></h2>
+</section>
+<section id="to-build-the-petalinux-images">
+<h2>To Build the Petalinux Images:<a class="headerlink" href="#to-build-the-petalinux-images" title="Link to this heading">¶</a></h2>
 <p>Follow the steps below to build petalinux images using the Makefile in <strong>../zcu670-ethernet-trd-2022.2/petalinux/xilinx-zcu670-trd</strong> path.</p>
 <ol>
 <li><p>Go to the petalinux BSP folder.</p>
@@ -187,29 +185,29 @@ function OptanonWrapper() { }
 <li><p>Copy the image (image.ub , BOOT.BIN and boot.scr ) to the FAT32 formatted SD card and insert the card in SD card slot to run the design. This image is functionally
 equivalent to the prebuilt sdcard image provided with package.</p></li>
 </ol>
-<div class="section" id="next-steps">
-<h3>Next Steps<a class="headerlink" href="#next-steps" title="Permalink to this heading">¶</a></h3>
+<section id="next-steps">
+<h3>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p><a class="reference internal" href="hw_arch_platform.html"><span class="doc">Hardware and Software Architecture</span></a></p></li>
 <li><p>Go back to the <a class="reference internal" href="../platform_landing.html"><span class="doc">zcu670 Targeted Reference Designs start page</span></a></p></li>
 </ul>
-</div>
-<div class="section" id="references">
-<h3>References<a class="headerlink" href="#references" title="Permalink to this heading">¶</a></h3>
+</section>
+<section id="references">
+<h3>References<a class="headerlink" href="#references" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Vivado user guide <a class="reference external" href="https://docs.xilinx.com/r/en-US/ug901-vivado-synthesis/Running-Synthesis">UG901</a></p></li>
 <li><p>Petalinux user guide <a class="reference external" href="https://www.xilinx.com/support/documentation/sw_manuals/xilinx2020_2/ug1144-petalinux-tools-reference-guide.pdf">UG1144</a></p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="license">
-<h2>License<a class="headerlink" href="#license" title="Permalink to this heading">¶</a></h2>
+</section>
+</section>
+<section id="license">
+<h2>License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h2>
 <p>Licensed under the Apache License, Version 2.0 (the “License”); you may not use this file except in compliance with the License.</p>
 <p>You may obtain a copy of the License at
 <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a></p>
 <p>Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an “AS IS” BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.</p>
-<p align="center">Copyright&copy; 2023 Xilinx</p></div>
-</div>
+<p align="center">Copyright&copy; 2023 Xilinx</p></section>
+</section>
 
 
            </div>
@@ -233,7 +231,7 @@ equivalent to the prebuilt sdcard image provided with package.</p></li>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on May 03, 2023.
+      <span class="lastupdated">Last updated on August 31, 2023.
       </span></p>
   </div>
 

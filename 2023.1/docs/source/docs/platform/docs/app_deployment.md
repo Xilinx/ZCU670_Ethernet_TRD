@@ -1,6 +1,6 @@
 ﻿<table class="sphinxhide">
  <tr>
-   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> RFSoC-ZCU670 Evaluation Kit Tutorial </h1>
+   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> ZCU670 Evaluation Kit Tutorial </h1>
    </td>
  </tr>
  <tr>
@@ -350,7 +350,7 @@ By default the interface links up at **25G**.
 
 **References**
 
-* ZYNQ ULTRASCALE+ RFSOC Quick Start Guide ([ZCU670](https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/1887797340/ZCU670+Quick+Start+Guide))
+* ZYNQ ULTRASCALE+ ZCU670 Quick Start Guide ([ZCU670](https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/1887797340/ZCU670+Quick+Start+Guide))
 
 ## License
 

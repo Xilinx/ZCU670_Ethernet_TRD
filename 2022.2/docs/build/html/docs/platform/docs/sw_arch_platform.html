@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
 <!-- OneTrust Cookies Consent Notice start for xilinx.github.io -->
@@ -19,11 +20,9 @@ function OptanonWrapper() { }
     <script src="../../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
-        <script src="../../../_static/jquery.js"></script>
-        <script src="../../../_static/underscore.js"></script>
-        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/documentation_options.js?v=13fe7e93"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
@@ -37,7 +36,6 @@ function OptanonWrapper() { }
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search">
             <a href="../../../index.html" class="icon icon-home"> ZCU670 Ethernet TRD
-            <img src="../../../_static/xilinx-header-logo.svg" class="logo" alt="Logo"/>
           </a>
               <div class="version">
                 1.0
@@ -103,16 +101,16 @@ function OptanonWrapper() { }
              
   <table class="sphinxhide">
  <tr>
-   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> RFSoC-ZCU670 Evaluation Kit Tutorial</h1>
+   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> ZCU670 Evaluation Kit Tutorial</h1>
    </td>
  </tr>
  <tr>
  <td align="center"><h1> Software Architecture of the Platform </h1> </td>
  </tr>
-</table><div class="section" id="software-architecture-of-the-platform">
-<h1>Software Architecture of the Platform<a class="headerlink" href="#software-architecture-of-the-platform" title="Permalink to this heading">¶</a></h1>
-<div class="section" id="introduction">
-<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">¶</a></h2>
+</table><section id="software-architecture-of-the-platform">
+<h1>Software Architecture of the Platform<a class="headerlink" href="#software-architecture-of-the-platform" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
 <p>The ZCU670 Ethernet platform design uses the AXI Ethernet driver present in Linux kernel to configure XXV MAC and initialize a lane of 25G ethernet rate. The driver initializes MCDMA’s S2MM and MM2S channel descriptors and enables them to transfer data to and from system memory. The driver also does interrupt handling when a packet is received or transmitted via DMA.</p>
 <p><img alt="Linux Software Stack and Vertical Domains" src="../../../_images/sw-stack.PNG" /></p>
 <blockquote>
@@ -128,9 +126,9 @@ function OptanonWrapper() { }
 <li><p>This solution is supported with the standard linuxptp user space application.</p></li>
 <li><p>The TRD supports a PL based PTP packet processing solution where HW shares Transmit timestamp via DMA control stream/USR-APP fields and Receive timestamp in-band via data stream.</p></li>
 </ul>
-</div>
-<div class="section" id="timestamp-handling-for-pl-based-ptp-packet-processing-solution">
-<h2>Timestamp Handling for PL based PTP Packet Processing solution<a class="headerlink" href="#timestamp-handling-for-pl-based-ptp-packet-processing-solution" title="Permalink to this heading">¶</a></h2>
+</section>
+<section id="timestamp-handling-for-pl-based-ptp-packet-processing-solution">
+<h2>Timestamp Handling for PL based PTP Packet Processing solution<a class="headerlink" href="#timestamp-handling-for-pl-based-ptp-packet-processing-solution" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>Transmit Timestamp Handling:</p>
 <ol class="simple">
@@ -156,8 +154,8 @@ function OptanonWrapper() { }
 <p>You may obtain a copy of the License at
 <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a></p>
 <p>Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an “AS IS” BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.</p>
-<p align="center">Copyright&copy; 2023 Xilinx</p></div>
-</div>
+<p align="center">Copyright&copy; 2023 Xilinx</p></section>
+</section>
 
 
            </div>
@@ -181,7 +179,7 @@ function OptanonWrapper() { }
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on May 03, 2023.
+      <span class="lastupdated">Last updated on August 31, 2023.
       </span></p>
   </div>
 

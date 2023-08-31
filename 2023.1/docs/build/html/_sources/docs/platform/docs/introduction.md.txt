@@ -1,6 +1,6 @@
 <table class="sphinxhide">
  <tr>
-   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> RFSOC - ZCU670 Evaluation Kit Ethernet TRD Tutorial</h1>
+   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> ZCU670 Evaluation Kit Ethernet TRD Tutorial</h1>
    </td>
  </tr>
  <tr>

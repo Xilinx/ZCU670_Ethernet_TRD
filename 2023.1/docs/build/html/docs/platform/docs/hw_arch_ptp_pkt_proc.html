@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
@@ -20,11 +20,9 @@ function OptanonWrapper() { }
     <script src="../../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
-        <script src="../../../_static/jquery.js"></script>
-        <script src="../../../_static/underscore.js"></script>
-        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/documentation_options.js?v=13fe7e93"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
@@ -38,7 +36,6 @@ function OptanonWrapper() { }
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search">
             <a href="../../../index.html" class="icon icon-home"> ZCU670 Ethernet TRD
-            <img src="../../../_static/xilinx-header-logo.svg" class="logo" alt="Logo"/>
           </a>
               <div class="version">
                 1.0
@@ -105,16 +102,16 @@ function OptanonWrapper() { }
              
   <table class="sphinxhide">
  <tr>
-   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> RFSoC-ZCU670 Evaluation Kit Tutorial</h1>
+   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> ZCU670 Evaluation Kit Tutorial</h1>
    </td>
  </tr>
  <tr>
  <td align="center"><h1> Hardware Architecture of the PTP Packet Processor </h1> </td>
  </tr>
 </table><section id="hardware-architecture-of-the-ptp-packet-processor">
-<h1>Hardware Architecture of the PTP Packet Processor<a class="headerlink" href="#hardware-architecture-of-the-ptp-packet-processor" title="Permalink to this heading">¶</a></h1>
+<h1>Hardware Architecture of the PTP Packet Processor<a class="headerlink" href="#hardware-architecture-of-the-ptp-packet-processor" title="Link to this heading">¶</a></h1>
 <section id="ptp-tx-hw-master-ip">
-<h2>PTP Tx HW MASTER IP<a class="headerlink" href="#ptp-tx-hw-master-ip" title="Permalink to this heading">¶</a></h2>
+<h2>PTP Tx HW MASTER IP<a class="headerlink" href="#ptp-tx-hw-master-ip" title="Link to this heading">¶</a></h2>
 <p>The PTP HW Master receives the necessary information from the USER-APP fields of the AXI MCDMA for capturing timestamp and storing it in memory for the Transmitted PTP packets. The address of the memory where the timestamp needs to be stored is provided by the USER-APP fields of AXI MCDMA Control stream.
 The SW provides a 2-bit PTP flag. Based on the value of the Flag bits, the PTP HW Master drives the tx_ptp_1588op_in [1:0] interface of MRMAC.
 MRMAC performs the PTP operation based on the 2 bit value of tx_ptp_1588op_in[1:0] as given in below table:</p>
@@ -147,7 +144,7 @@ MRMAC performs the PTP operation based on the 2 bit value of tx_ptp_1588op_in[1:
 <p>When the ptp flag value is “10”, the PTP HW Master initiates a memory write operation of the timestamp value. The timestamp value is written into the memory via NoC. The PTP HW Master makes the final bit 1 (qualifier bit) to indicate the memory write completion to Software.</p>
 </section>
 <section id="rx-ptp-packet-detect-and-prepend-logic-rx-hardware-master">
-<h2>Rx PTP PACKET DETECT and PREPEND LOGIC (RX Hardware Master)<a class="headerlink" href="#rx-ptp-packet-detect-and-prepend-logic-rx-hardware-master" title="Permalink to this heading">¶</a></h2>
+<h2>Rx PTP PACKET DETECT and PREPEND LOGIC (RX Hardware Master)<a class="headerlink" href="#rx-ptp-packet-detect-and-prepend-logic-rx-hardware-master" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>PTP Packet Detection IP parses all the received Packets.</p></li>
 <li><p>When a PTP packet is received, it parses the Header and sets a PTP Qualifier bit (i) when a PTP packet is detected, that helps the PTP application in upper layer for further processing.</p></li>
@@ -216,7 +213,7 @@ MRMAC performs the PTP operation based on the 2 bit value of tx_ptp_1588op_in[1:
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on July 20, 2023.
+      <span class="lastupdated">Last updated on August 31, 2023.
       </span></p>
   </div>
 

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
@@ -20,11 +20,9 @@ function OptanonWrapper() { }
     <script src="../../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
-        <script src="../../../_static/jquery.js"></script>
-        <script src="../../../_static/underscore.js"></script>
-        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/documentation_options.js?v=13fe7e93"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
@@ -38,7 +36,6 @@ function OptanonWrapper() { }
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search">
             <a href="../../../index.html" class="icon icon-home"> ZCU670 Ethernet TRD
-            <img src="../../../_static/xilinx-header-logo.svg" class="logo" alt="Logo"/>
           </a>
               <div class="version">
                 1.0
@@ -107,19 +104,19 @@ function OptanonWrapper() { }
              
   <table class="sphinxhide">
  <tr>
-   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> RFSoC-ZCU670 Evaluation Kit Tutorial </h1>
+   <td align="center"><img src="../../media/xilinx-logo.png" width="30%"/><h1> ZCU670 Evaluation Kit Tutorial </h1>
    </td>
  </tr>
  <tr>
  <td align="center"><h1> Board Setup and Application Deployment</h1> </td>
  </tr>
 </table><section id="setting-up-the-board-and-application-deployment">
-<h1>Setting up the Board and Application Deployment<a class="headerlink" href="#setting-up-the-board-and-application-deployment" title="Permalink to this heading">¶</a></h1>
+<h1>Setting up the Board and Application Deployment<a class="headerlink" href="#setting-up-the-board-and-application-deployment" title="Link to this heading">¶</a></h1>
 <section id="introduction">
-<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">¶</a></h2>
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
 <p>This document shows how to set up the board and run the ZCU670 Ethernet TRD application with prebuilt images.</p>
 <section id="prerequisites">
-<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h3>
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h3>
 <ul>
 <li><p>Reference design package <code class="docutils literal notranslate"><span class="pre">zcu670_ethernet_trd_2023.1.zip</span></code> file</p></li>
 <li><p>ZCU670 Evaluation Board with power cable - 2 No.</p></li>
@@ -136,7 +133,7 @@ function OptanonWrapper() { }
 </ul>
 </section>
 <section id="board-setup">
-<h3>Board Setup<a class="headerlink" href="#board-setup" title="Permalink to this heading">¶</a></h3>
+<h3>Board Setup<a class="headerlink" href="#board-setup" title="Link to this heading">¶</a></h3>
 <p>The following figure shows the ZCU670 evaluation board set up.</p>
 <p><img alt="setup" src="../../../_images/zcu670_setup_new.png" /></p>
 <p><strong>Board jumper and switch settings</strong></p>
@@ -147,7 +144,7 @@ function OptanonWrapper() { }
 </ul>
 </section>
 <section id="flash-the-sd-card">
-<h3>Flash the SD Card<a class="headerlink" href="#flash-the-sd-card" title="Permalink to this heading">¶</a></h3>
+<h3>Flash the SD Card<a class="headerlink" href="#flash-the-sd-card" title="Link to this heading">¶</a></h3>
 <ol>
 <li><p>Unzip the package and save it on your computer.</p></li>
 <li><p>Navigate to the <code class="docutils literal notranslate"><span class="pre">../zcu670-ethernet-trd-2023.1/prebuilt</span></code> folder.</p></li>
@@ -160,16 +157,16 @@ function OptanonWrapper() { }
 </ol>
 </section>
 <section id="gt-reference-clocks">
-<h3>GT Reference clocks<a class="headerlink" href="#gt-reference-clocks" title="Permalink to this heading">¶</a></h3>
+<h3>GT Reference clocks<a class="headerlink" href="#gt-reference-clocks" title="Link to this heading">¶</a></h3>
 <p>The GT Reference clocks required for the design are configured by the Renesas IDT drivers while booting. The 8A34001 chip is the clock source for IEEE 1588 and Synchronous Ethernet (SyncE) based clocks.</p>
 </section>
 <section id="uart-driver-install">
-<h3>UART Driver Install<a class="headerlink" href="#uart-driver-install" title="Permalink to this heading">¶</a></h3>
+<h3>UART Driver Install<a class="headerlink" href="#uart-driver-install" title="Link to this heading">¶</a></h3>
 <p>Prior to connecting and powering on the ZCU670, install the FTDI CDM Drivers <a href="https://www.ftdichip.com/Drivers/CDM/CDM21228_Setup.zip">FTDI CDM Driver </a></p>
 <p><img alt="UART" src="../../../_images/FTDI_driver.png" /></p>
 </section>
 <section id="sd-boot-mode">
-<h3>SD Boot Mode:<a class="headerlink" href="#sd-boot-mode" title="Permalink to this heading">¶</a></h3>
+<h3>SD Boot Mode:<a class="headerlink" href="#sd-boot-mode" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Connect the power supply to the ZCU670 (J52) port and Power on the board</p></li>
 </ul>
@@ -210,7 +207,7 @@ function OptanonWrapper() { }
 </ul>
 </section>
 <section id="running-the-applications-on-board">
-<h3>Running the applications on board<a class="headerlink" href="#running-the-applications-on-board" title="Permalink to this heading">¶</a></h3>
+<h3>Running the applications on board<a class="headerlink" href="#running-the-applications-on-board" title="Link to this heading">¶</a></h3>
 <p>Once the zcu670 boards are booted, set up an IP address for the interface (in this case eth1) and make sure the Ethernet link is established between boards. Do not proceed until you are able to ping between boards.</p>
 <blockquote>
 <div><ul class="simple">
@@ -230,9 +227,9 @@ function OptanonWrapper() { }
 </section>
 </section>
 <section id="ptp-commands">
-<h2>PTP commands<a class="headerlink" href="#ptp-commands" title="Permalink to this heading">¶</a></h2>
+<h2>PTP commands<a class="headerlink" href="#ptp-commands" title="Link to this heading">¶</a></h2>
 <section id="phase-synchronization">
-<h3>Phase Synchronization<a class="headerlink" href="#phase-synchronization" title="Permalink to this heading">¶</a></h3>
+<h3>Phase Synchronization<a class="headerlink" href="#phase-synchronization" title="Link to this heading">¶</a></h3>
 <p><strong>Master:</strong></p>
 <ul class="simple">
 <li><p>Run ptp4l in master mode:</p></li>
@@ -301,7 +298,7 @@ function OptanonWrapper() { }
 </div>
 </section>
 <section id="frequency-synchronization">
-<h3>Frequency Synchronization<a class="headerlink" href="#frequency-synchronization" title="Permalink to this heading">¶</a></h3>
+<h3>Frequency Synchronization<a class="headerlink" href="#frequency-synchronization" title="Link to this heading">¶</a></h3>
 <blockquote>
 <div><ul class="simple">
 <li><p><strong>Note: Before running frequency syncronization kill all instance of ts2phc running background.</strong></p></li>
@@ -364,7 +361,7 @@ function OptanonWrapper() { }
 </section>
 </section>
 <section id="iperf-commands">
-<h2>Iperf Commands<a class="headerlink" href="#iperf-commands" title="Permalink to this heading">¶</a></h2>
+<h2>Iperf Commands<a class="headerlink" href="#iperf-commands" title="Link to this heading">¶</a></h2>
 <blockquote>
 <div><ul class="simple">
 <li><p><strong>Note: Make sure to apply taskset to appropriate CPU core while running iperf traffic as shown in below commands.</strong></p></li>
@@ -464,19 +461,19 @@ function OptanonWrapper() { }
 </li>
 </ul>
 <section id="next-steps">
-<h3>Next Steps<a class="headerlink" href="#next-steps" title="Permalink to this heading">¶</a></h3>
+<h3>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p><a class="reference internal" href="build_vivado_design.html"><span class="doc">Building the TRD source Files</span></a></p></li>
 <li><p>Go back to the <a class="reference internal" href="../platform_landing.html"><span class="doc">zcu670 Targeted Reference Designs start page</span></a></p></li>
 </ul>
 <p><strong>References</strong></p>
 <ul class="simple">
-<li><p>ZYNQ ULTRASCALE+ RFSOC Quick Start Guide (<a class="reference external" href="https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/1887797340/ZCU670+Quick+Start+Guide">ZCU670</a>)</p></li>
+<li><p>ZYNQ ULTRASCALE+ ZCU670 Quick Start Guide (<a class="reference external" href="https://xilinx-wiki.atlassian.net/wiki/spaces/A/pages/1887797340/ZCU670+Quick+Start+Guide">ZCU670</a>)</p></li>
 </ul>
 </section>
 </section>
 <section id="license">
-<h2>License<a class="headerlink" href="#license" title="Permalink to this heading">¶</a></h2>
+<h2>License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h2>
 <p>Licensed under the Apache License, Version 2.0 (the “License”); you may not use this file except in compliance with the License.</p>
 <p>You may obtain a copy of the License at
 <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a></p>
@@ -506,7 +503,7 @@ function OptanonWrapper() { }
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Xilinx, Inc. Xilinx is now a part of AMD.
-      <span class="lastupdated">Last updated on July 20, 2023.
+      <span class="lastupdated">Last updated on August 31, 2023.
       </span></p>
   </div>
 
