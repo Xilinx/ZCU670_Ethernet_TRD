@@ -9,6 +9,8 @@
 
 The ZCU670 Ethernet TRD consists of a platform to demonstrate various aspects of the design and functionality of various Board interfaces present on the ZCU670 Evaluation Board. A platform is a Vivado design plus a corresponding PetaLinux BSP and image that includes the required kernel drivers and user-space libraries to exercise those interfaces. The reference design currently supports the ZCU670 Production board Rev-B. 
 
+><b>Note : </b>Please note that the Ethernet Subsystem in the <b>ZCU670 OpenRAN Radio (O-RU)</b> TRD differs significantly from the <b>ZCU670 Ethernet TRD</b> from this repository.
+
 The following is a list of Platform Designs available :
 | Platform Name  | Description | Links |
 | ---------------|------------- | -------------- |
