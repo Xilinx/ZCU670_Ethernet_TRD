@@ -25,11 +25,11 @@ ITU-T G.8273.4 Partial Time Support Standard
 AMD, in collaboration with Renesas, tested the TRD package for the ITU-T G.8273.4 Partial Time Support standard. 
 
 ### Test Reports
-The performance report can be downloaded from [Renesas](https://www.renesas.com/en/support)
+The performance report can be downloaded from [Compliance Test Report](https://www.renesas.com/en/products/clocks-timing/timing-partner-ecosystem/amd-5g-radio-evaluation-kit#overview)
 
 ### Reference
 
-* 8A3400x ITU-T G.8262 and G.8262.1 [Compliance Test Report](https://www.renesas.com/en/document/rep/8a3400x-itu-t-g8262-and-g82621-compliance-test-report?r=455866)
+* 8A3400x ITU-T G.8262 and G.8262.1 [8A3400X Compliance](https://www.renesas.com/en/document/rep/8a3400x-itu-t-g8262-and-g82621-compliance-test-report?r=455866)
 
 
 ## License
