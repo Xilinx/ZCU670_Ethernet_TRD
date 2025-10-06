@@ -129,6 +129,7 @@ In a terminal emulator, connect to UART0 using the following settings:
   xilinx-zcu670-20241:~$:sudo su
    ```  
 ### Running the applications on board
+> * **Note:** ZCU670 boards include a Renesas 8A34001 SMU chip preloaded with Clock Manager Firmware (CM FW) version 4.8.0. This version does not fully support PTP. To enable proper PTP functionality, update to CM FW 4.9.9 by following [AR-000038884](https://adaptivesupport.amd.com/s/article/000038884?language=en_US)
 
 Once the zcu670 boards are booted, set up an IP address for the interface (in this case eth1 and eth2) and make sure the Ethernet link is established between boards. Do not proceed until you are able to ping between boards.
 
@@ -1092,6 +1093,33 @@ synced[250.296]: <<Sent information ESMC PDU with QL-DNU (8) (extended QL TLV: y
 
 > * **Note:** *`Current QL upgraded from QL-SEC (7) to QL-PRTC (1)`* in slave side log indicates syncE has switched the external MUX and, the clock port of *`eth2`* is selected as primary clock.
 
+### PPS commands
+* To enable PPS signal from Renesas ClockMatrix PHC :
+``` 
+> testptp -d /dev/ptp0 -i 2 -p 1000000000
+```
+
+* To check the PPS external timestamp event of AMD Timer-Syncer PHC:
+``` 
+> testptp -e 10 -d /dev/ptp1
+``` 
+> * **Note:** Make sure to re-enable PPS after running ts2phc, as it temporarily disables PPS during execution.
+
+**testptp log** :
+``` 
+xilinx-zcu670-20241:/home/petalinux# testptp -e 10 -d /dev/ptp1
+external time stamp request okay
+event index 0 at 3264.000000434
+event index 0 at 3265.000000434
+event index 0 at 3266.000000434
+event index 0 at 3267.000000434
+event index 0 at 3268.000000434
+event index 0 at 3269.000000434
+event index 0 at 3270.000000434
+event index 0 at 3271.000000434
+event index 0 at 3272.000000434
+event index 0 at 3273.000000434
+```
 
 ### PTP commands
 > * **Note:** PTP commands in this section are given assuming one board as master (Board-1) and the second board as slave (Board-2).
@@ -1105,226 +1133,228 @@ PTP phase synchronization commands given in this section uses the ITU-T profile 
 G.8275.1 profile transport PTP packets directly over L2 ethernet for accurate synchronization of time and phase. This profile is used for networks with full timing support, where every network element participates in PTP.
 	
 **Master:**
+
+* Run ts2phc between Renesas ClockMatrix PHC and AMD Timer-Syncer PHC in background:
+
+``` 
+Board-1 > ts2phc -mqf /usr/bin/zcu670_ts2phc.cfg &
+``` 
    
 * Run ptp4l using G.8275.1 configuration on master board:
 ```     
 Board-1 > ptp4l -i <interface-name> -f  /usr/bin/linkpartner_G.8275.1.cfg -m
 ```
-> * **Note:** Interface name in `linkpartner_G.8275.1.cfg` is configured as `eth1`, change the interface name while running it on other interface.
 
 **ptp4l master side log** :
 ``` 
-xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -f/usr/bin/linkpartner_G.8275.1.cfg -m
+xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -f /usr/bin/linkpartner_G.8275.1.cfg -m
 option masterOnly is deprecated, please use serverOnly instead
-xilinx-zcu670-20241:/home/petalinux# ptp4l[580.096]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[580.096]: selected /dev/ptp1 as PTP clock
-ptp4l[580.136]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[580.136]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[580.136]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[580.515]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
-ptp4l[580.515]: selected local clock e62aaf.fffe.477fdc as best master
-ptp4l[580.515]: port 1 (eth1): assuming the grand master role
-
+ptp4l[13018.067]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[13018.068]: selected /dev/ptp1 as PTP clock
+ptp4l[13018.120]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[13018.120]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[13018.120]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[13018.533]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
+ptp4l[13018.534]: selected local clock 8215f9.fffe.ca805f as best master
+ptp4l[13018.534]: port 1 (eth1): assuming the grand master role
 ``` 
 
 **Slave:**	
 * Run ts2phc between Renesas ClockMatrix PHC and AMD Timer-Syncer PHC in background:
 
 ``` 
-Board-2 > ts2phc -m -c <interface-name> -s /dev/ptp0 -f /usr/bin/ts2phc.cfg &
+Board-2 > ts2phc -mqf /usr/bin/zcu670_ts2phc.cfg &
 ``` 
-
-**ts2phc log** :	
-``` 
-[795.951957] driver cannot use function 2 on pin 0
-PTP_PIN_SETFUNC failed: Operation not supported
-xilinx-zcu670-20241:/home/petalinux# ts2phc[795.820]: Failed to set the pin. Continuing bravely on...
-``` 
-
-> * **Note:** This message can be ignored because the Renesas ClockMatrix PHC driver does not support dynamic PTP_PIN_SETFUNC. For more details refer [Renesas Phase Adjust quick start manual](https://www.renesas.com/us/en/document/mas/linux-ptp-using-phc-adjust-phase-quick-start-manual) or Use -l option.
-   
+ 
 * Run ptp4l using G.8275.1 configuration on slave board:
 
 > * **Note:** Ensure that only one instance of ptp4l master is running in Link partner.   
 
 ``` 	
-Board-2 > ptp4l -m -q -p /dev/ptp0 -s -f /usr/bin/standalone_G.8275.1.cfg
-```     
+Board-2 > ptp4l -mqf /usr/bin/standalone_G.8275.1.cfg -p /dev/ptp0 
+``` 
+> * **Note:** Interface name in `standalone_G.8275.1.cfg` is configured as `eth1`, change the interface name while running it on other interface.    
 
 **ptp4l phase synchronization log** :	
 ``` 
-xilinx-zcu670-20241:/home/petalinux# ptp4l -m -q -p /dev/ptp0 -s -f /usr/bin/standalone_G.8275.1.cfg &
-[2] 665
+xilinx-zcu670-20241:/home/petalinux# ptp4l -mqf /usr/bin/standalone_G.8275.1.cfg -p /dev/ptp0
 option masterOnly is deprecated, please use serverOnly instead
-xilinx-zcu670-20241:/home/petalinux# option slaveOnly is deprecated, please use clientOnly instead
-ptp4l[1055.684]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[1055.684]: selected /dev/ptp0 as PTP clock
-ptp4l[1055.687]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
-ptp4l[1055.724]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[1055.724]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[1055.724]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[1055.724]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
-ptp4l[1055.765]: port 1 (eth1): new foreign master e62aaf.fffe.477fdc-1
-ptp4l[1056.015]: selected best master clock e62aaf.fffe.477fdc
-ptp4l[1056.015]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
-ptp4l[1056.328]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
-ptp4l[1057.016]: rms 864925133106414720 max 1729850266212829440 freq -182998 +/- 105659 delay -3050 +/- 2318
-ptp4l[1058.016]: rms 53161820 max 212646650 freq +174980 +/- 115209 delay -5909917 +/- 24378824
-ptp4l[1059.017]: rms 21563 max 31794 freq +58444 +/- 36877 delay   843 +/- 694
-ptp4l[1060.017]: rms 28013 max 31567 freq -12305 +/- 7507 delay   -82 +/- 198
-ptp4l[1061.017]: rms 12020 max 19392 freq -15873 +/- 2893 delay  -182 +/- 194
-ptp4l[1062.018]: rms 1575 max 3363 freq  -4984 +/- 2605 delay   -27 +/-  92
-ptp4l[1063.018]: rms 1938 max 2098 freq   +556 +/- 692 delay    82 +/-  18
-ptp4l[1064.019]: rms  960 max 1490 freq  +1169 +/- 176 delay    92 +/-   9
-ptp4l[1065.019]: rms  147 max  317 freq   +457 +/- 189 delay    87 +/-   6
-ptp4l[1066.019]: rms  132 max  144 freq    +18 +/-  63 delay    79 +/-   1
-ptp4l[1067.020]: rms   72 max  107 freq    -45 +/-  10 delay    77 +/-   1
-ptp4l[1068.020]: rms   12 max   28 freq     +2 +/-  11 delay    78 +/-   1
-ptp4l[1069.021]: rms    7 max   11 freq    +30 +/-   5 delay    78 +/-   0
-ptp4l[1070.021]: rms    6 max    8 freq    +39 +/-   3 delay    78 +/-   1
-ptp4l[1071.021]: rms    5 max    8 freq     +5 +/-  14 delay    79 +/-   0
+option slaveOnly is deprecated, please use clientOnly instead
+ptp4l[12781.908]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[12781.908]: selected /dev/ptp0 as PTP clock
+ptp4l[12781.910]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
+ptp4l[12781.952]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[12781.952]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[12781.952]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[12781.952]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
+ptp4l[12782.076]: port 1 (eth1): new foreign master 8215f9.fffe.ca805f-1
+ptp4l[12782.326]: selected best master clock 8215f9.fffe.ca805f
+ptp4l[12782.326]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
+ptp4l[12788.704]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
+ptp4l[12789.391]: rms 177395279808 max 354790559620 freq   -115 +/-  81 delay   171 +/-   2
+ptp4l[12790.392]: rms   25 max   34 freq    -13 +/-  32 delay   173 +/-   1
+ptp4l[12791.392]: rms   23 max   33 freq    +31 +/-   2 delay   174 +/-   1
+ptp4l[12792.393]: rms    6 max   13 freq    +21 +/-   6 delay   174 +/-   1
+ptp4l[12793.393]: rms    2 max    3 freq    +12 +/-   2 delay   174 +/-   1
+ptp4l[12794.393]: rms    3 max    5 freq    +10 +/-   4 delay   174 +/-   1
+ptp4l[12795.394]: rms    1 max    2 freq    +10 +/-   2 delay   174 +/-   1
+ptp4l[12796.394]: rms    2 max    5 freq    +11 +/-   4 delay   174 +/-   1
+
 ```
 #### Unicast Mode (G.8275.2):
 G.8275. 2 profile transport PTP packets over IPv4 or IPv6 in unicast mode. It is aimed at operating in existing network not necessarily all devices in the network are PTP aware.
 
 **Master:**
+
+* Run ts2phc between Renesas ClockMatrix PHC and AMD Timer-Syncer PHC in background:
+
+``` 
+Board-1 > ts2phc -mqf /usr/bin/zcu670_ts2phc.cfg &
+``` 
    
 * Run ptp4l using G.8275.2 configuration on master board:
 ```     
-Board-1 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/unicast_master.cfg
+Board-1 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/zcu670_unicast_master.cfg &
 ```
 **ptp4l master side log** :
 ``` 
-xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/unicast_master.cfg
+xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/zcu670_unicast_master.cfg
 option slaveOnly is deprecated, please use clientOnly instead
 option masterOnly is deprecated, please use serverOnly instead
-ptp4l[12921.595]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[12921.595]: selected /dev/ptp1 as PTP clock
-ptp4l[12921.596]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[12921.597]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[12921.597]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[12926.605]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
-ptp4l[12926.605]: selected local clock 2ee617.fffe.3a422b as best master
-ptp4l[12926.605]: port 1 (eth1): assuming the grand master role
-
+ptp4l[5457.096]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[5457.096]: selected /dev/ptp1 as PTP clock
+ptp4l[5457.097]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[5457.097]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[5457.097]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[5461.497]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
+ptp4l[5461.497]: selected local clock 0ec438.fffe.4dda81 as best master
+ptp4l[5461.497]: port 1 (eth1): assuming the grand master role
 ``` 
 
 **Slave:**	
 * Run ts2phc between Renesas ClockMatrix PHC and AMD Timer-Syncer PHC in background:
 
 ``` 
-Board-2 > ts2phc -m -c <interface-name> -s /dev/ptp0 -f /usr/bin/ts2phc.cfg &
+Board-2 > ts2phc -mqf /usr/bin/zcu670_ts2phc.cfg &
 ``` 
 
-**ts2phc log** :	
-``` 
-[160.199571] driver cannot use function 2 on pin 0
-PTP_PIN_SETFUNC failed: Operation not supported
-xilinx-zcu670-20241:/home/petalinux# ts2phc[158.430]: Failed to set the pin. Continuing bravely on...
-``` 
-
-> * **Note:** This message can be ignored because the Renesas ClockMatrix PHC driver does not support dynamic PTP_PIN_SETFUNC. For more details refer [Renesas Phase Adjust quick start manual](https://www.renesas.com/us/en/document/mas/linux-ptp-using-phc-adjust-phase-quick-start-manual) or Use -l option.
-   
 * Run ptp4l using G.8275.2 configuration on slave board:
 
-> * **Note:** Before running ptp4l on slave board, add IP address of master interface to the unicast_master_table given in `/usr/local/etc/ptp4l/standalone_unicast_1port.cfg` config file .
+> * **Note:**  Before running ptp4l on the slave board, add the master’s UDPv4 IP to unicast_master_table in the `zcu670_standalone_unicast_1port.cfg` config file. Also, update the default interface eth1 if using a different one.
 
 ``` 	
-Board-2 > ptp4l -m -q -p /dev/ptp0 -s -f /usr/local/etc/ptp4l/standalone_unicast_1port.cfg
+Board-2 > ptp4l -mqf /usr/local/etc/ptp4l/zcu670_standalone_unicast_1port.cfg -p /dev/ptp0 
 ```     
 > * **Note:** Ensure that only one instance of ptp4l master is running in Link partner.   
 
 
 **ptp4l phase synchronization log** :	
 ``` 
-xilinx-zcu670-20241:/home/petalinux# ptp4l -m -q -p /dev/ptp0 -s -f /usr/local/etc/ptp4l/standalone_unicast_1port.cfg
+xilinx-zcu670-20241:/home/petalinux# ptp4l -mqf /usr/local/etc/ptp4l/zcu670_standalone_unicast_1port.cfg -p /dev/ptp0 
 option slaveOnly is deprecated, please use clientOnly instead
 option masterOnly is deprecated, please use serverOnly instead
-ptp4l[260.199]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[260.200]: selected /dev/ptp0 as PTP clock
-ptp4l[260.202]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
-ptp4l[260.203]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[260.203]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[260.203]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[260.203]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
-ptp4l[264.213]: port 1 (eth1): new foreign master 2ee617.fffe.3a422b-1
-ptp4l[264.895]: selected local clock f6b39a.fffe.9ec243 as best master
-ptp4l[268.213]: selected best master clock 2ee617.fffe.3a422b
-ptp4l[268.213]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
-ptp4l[275.464]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
-ptp4l[276.151]: rms 863419759775437184 max 1726839519550874368 freq +15680 +/- 9951 delay   378 +/- 262
-ptp4l[277.151]: rms 2983 max 4079 freq  +4834 +/- 3876 delay   151 +/-  69
-ptp4l[278.151]: rms 3337 max 4063 freq  -2038 +/- 579 delay    44 +/-  17
-ptp4l[279.151]: rms 1194 max 2047 freq  -1777 +/- 418 delay    47 +/-  20
-ptp4l[280.151]: rms  182 max  266 freq   -423 +/- 296 delay    70 +/-   5
-ptp4l[281.151]: rms  239 max  273 freq   +148 +/-  61 delay    78 +/-   2
-ptp4l[282.151]: rms  101 max  160 freq   +172 +/-  28 delay    79 +/-   1
-ptp4l[283.151]: rms   13 max   27 freq    +76 +/-  23 delay    77 +/-   1
-ptp4l[284.151]: rms   15 max   18 freq    +35 +/-   9 delay    77 +/-   0
-ptp4l[285.151]: rms   12 max   15 freq    +18 +/-   4 delay    77 +/-   1
-ptp4l[286.151]: rms    4 max    9 freq     +7 +/-   9 delay    77 +/-   1
+ptp4l[5514.664]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[5514.664]: selected /dev/ptp0 as PTP clock
+ptp4l[5514.666]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
+ptp4l[5514.667]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[5514.667]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[5514.667]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[5514.667]: port 1 (eth1): taking /dev/ptp0 from the command line, not the attached ptp1
+ptp4l[5516.013]: port 1 (eth1): new foreign master 0ec438.fffe.4dda81-1
+ptp4l[5519.924]: selected local clock b69a81.fffe.30b74a as best master
+ptp4l[5520.013]: selected best master clock 0ec438.fffe.4dda81
+ptp4l[5520.013]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
+ptp4l[5526.355]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
+ptp4l[5527.042]: rms 5720717720 max 11441435445 freq   -154 +/- 106 delay   169 +/-   3
+ptp4l[5528.043]: rms   25 max   37 freq    -47 +/-  40 delay   169 +/-   2
+ptp4l[5529.043]: rms   32 max   37 freq    +26 +/-   8 delay   172 +/-   0
+ptp4l[5530.043]: rms   18 max   22 freq    +41 +/-   5 delay   173 +/-   0
+ptp4l[5531.044]: rms    4 max    7 freq    +30 +/-   5 delay   173 +/-   0
+ptp4l[5532.044]: rms    5 max    6 freq    +15 +/-   3 delay   171 +/-   0
+ptp4l[5533.044]: rms    4 max    6 freq    +12 +/-   3 delay   172 +/-   0
+ptp4l[5534.045]: rms    2 max    4 freq    +16 +/-   3 delay   172 +/-   1
+ptp4l[5535.045]: rms    3 max    5 freq    +24 +/-   2 delay   172 +/-   0
+ptp4l[5536.046]: rms    2 max    3 freq    +18 +/-   2 delay   172 +/-   1
+ptp4l[5537.046]: rms    2 max    4 freq    +20 +/-   3 delay   172 +/-   0
+ptp4l[5538.046]: rms    2 max    4 freq    +22 +/-   4 delay   172 +/-   0
+ptp4l[5539.047]: rms    3 max    7 freq    +29 +/-   3 delay   172 +/-   0
 ```
 
 ### PTP clock manager for Linux (pcm4l)
 Renesas pcm4l utility, has external servo and Packet Delay Variation (PDV) filters specifically meant for the functional requirements of ITU-telecom profile specifications. 
 
-> * **Note:** For pcm4l tests, the `ts2phc`Linux PTP utility used for synchronizing Renesas ClockMatrix PHC and AMD Timer-Syncer PHC is replaced with `pcm4l` utility. Kill all instance of `ts2phc` before running `pcm4l`.
+> * **Note:** For `pcm4l` tests, the `ts2phc` utility used to sync Renesas ClockMatrix PHC and AMD Timer-Syncer PHC is replaced by `pcm4l`. Ensure all `ts2phc` instances are terminated before running `pcm4l`.
 
 #### Multicast Mode(G.8275.1):
 
 **Master:**
+* Run ts2phc between Renesas ClockMatrix PHC and AMD Timer-Syncer PHC in background:
+
+``` 
+Board-1 > ts2phc -mqf /usr/bin/zcu670_ts2phc.cfg &
+``` 
 
 * Run ptp4l using G.8275.1 configuration on master board:
 
 ``` 
-Board -1 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/multicast_master.cfg
+Board -1 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/zcu670_multicast_master.cfg
  ``` 
 **ptp4l master side log**:
 ``` 
-xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/multicast_master.cfg
+xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/zcu670_multicast_master.cfg
 option slaveOnly is deprecated, please use clientOnly instead
 option masterOnly is deprecated, please use serverOnly instead
-ptp4l[142080.791]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[142080.792]: selected /dev/ptp1 as PTP clock
-ptp4l[142080.828]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[142080.828]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on NIT_COMPLETE
-ptp4l[142080.828]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[142081.445]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
-ptp4l[142081.445]: selected local clock e293dd.fffe.d944a5 as best master
-ptp4l[142081.445]: port 1 (eth1): assuming the grand master role
+ptp4l[260.319]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[260.320]: selected /dev/ptp1 as PTP clock
+ptp4l[260.364]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[260.364]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[260.364]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[260.815]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
+ptp4l[260.816]: selected local clock 4ad1c5.fffe.4721fe as best master
+ptp4l[260.816]: port 1 (eth1): assuming the grand master role
 ``` 
 **Slave:**
 
 * Run ptp4l enabling external servo on slave board:
 ```
-Board -2 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/externServo_multicast_1port.cfg &
+Board -2 > ptp4l -mqf /usr/local/etc/ptp4l/zcu670_externServo_multicast_1port.cfg -p /dev/ptp0 &
 ```
+
+> * **Note:** Interface name in `zcu670_externServo_multicast_1port.cfg` is configured as `eth1`, change the interface name while running it on other interface.  
 
 **ptp4l slave side log**:
 ```
-xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/externServo_multicast_1port.cfg
+xilinx-zcu670-20241:/home/petalinux# ptp4l -mqf /usr/local/etc/ptp4l/zcu670_externServo_multicast_1port.cfg -p /dev/ptp0 &
+[1] 659
 option slaveOnly is deprecated, please use clientOnly instead
-option masterOnly is deprecated, please use serverOnly instead
-ptp4l[56993.451]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[56993.488]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[56993.488]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[56993.488]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[56993.492]: port 1 (eth1): new foreign master e293dd.fffe.d944a5-1
-ptp4l[56993.742]: selected best master clock e293dd.fffe.d944a5
-ptp4l[56993.743]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
-ptp4l[56995.773]: master offset     125708 s0 freq   +1566 path delay        37
-ptp4l[56997.774]: master offset     128844 s0 freq   +1565 path delay        32
-ptp4l[56999.775]: master offset     131972 s0 freq   +1574 path delay        53
-ptp4l[57001.776]: master offset     135140 s0 freq   +1573 path delay        32
-ptp4l[57003.776]: master offset     138258 s0 freq   +1569 path delay        54
-
+xilinx-zcu670-20241:/home/petalinux# option masterOnly is deprecated, please use serverOnly instead
+ptp4l[1526.464]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[1526.504]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[1526.504]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[1526.504]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[1526.539]: port 1 (eth1): new foreign master 4ad1c5.fffe.4721fe-1
+ptp4l[1526.789]: selected best master clock 4ad1c5.fffe.4721fe
+ptp4l[1526.789]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
+ptp4l[1528.852]: master offset 1758718775620075969 s0 freq     +24 path delay       170
+ptp4l[1530.853]: master offset 1758718775620076027 s0 freq     +29 path delay       173
+ptp4l[1532.854]: master offset 1758718775620076055 s0 freq     +14 path delay       171
+ptp4l[1534.854]: master offset 1758718775620076124 s0 freq     +33 path delay       171
+ptp4l[1536.855]: master offset 1758718775620076176 s0 freq     +26 path delay       171
+ptp4l[1538.856]: master offset 1758718775620076230 s0 freq     +27 path delay       169
+ptp4l[1540.857]: master offset 1758718775620076267 s0 freq     +19 path delay       173
+ptp4l[1542.857]: master offset 1758718775620076294 s0 freq     +13 path delay       171
+ptp4l[1544.858]: master offset 1758718775620076342 s0 freq     +24 path delay       171
+ptp4l[1546.859]: master offset 1758718775620076384 s0 freq     +21 path delay       171
+ptp4l[1548.860]: master offset 1758718775620076430 s0 freq     +24 path delay       171
 ```  
 > * **Note:** PTP clock servo state remains in unlocked state (s0), expecting pcm4l to control the servo.
 
 * Run pcm4l:
 ```
-Board -2 > pcm4l -f /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json
+Board -2 > pcm4l -f /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json
 ```
+> * **Note:** If you see RE::SyncError messages related to PPS while running pcm4l, enable PPS using `testptp -d /dev/ptp0 -i 2 -p 1000000000`
+
 
 **pcm4l log**:
 
@@ -1333,441 +1363,558 @@ The pcm4l log is given below.
 <details>
 <summary>Click to expand </summary>
    
-	xilinx-zcu670-20241:/home/petalinux# pcm4l -f /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json
-	The file is /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json
-	JSON file: /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json
+	xilinx-zcu670-20241:/home/petalinux# pcm4l -f /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json	
+	The file is /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json
+	JSON file: /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json
+	Initialize default configuration values for linux Extern
 	Start Logger
-	RE::SyncAnalysis: 2024-09-19 10:26:45 672180888 ns [0, Main] (3561) RE PTP Software Release ID = 4.3.1.390841, Commit ID = 3299c31d457548b46ebd2a40127622a953f5088c    Aug 16 2024  19:54:09  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672271729 ns [0, Main] (3561) {  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672293319 ns [0, Main] (3561)   "versionId": "4.3",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672314079 ns [0, Main] (3561)   "testModeEnable": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672349090 ns [0, Main] (3561)   "referenceTrackerType": "WritePhase",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672382930 ns [0, Main] (3561)   "remoteUdsAddress": "/var/run/ptp4l",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672409580 ns [0, Main] (3561)   "localUdsAddress": "/var/run/pcm4l",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672436411 ns [0, Main] (3561)   "mngApiTimeoutMilliseconds": 100,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672462621 ns [0, Main] (3561)   "stepWindowSeconds": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672485411 ns [0, Main] (3561)   "phc4lConfig":  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672505981 ns [0, Main] (3561)   {  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672525961 ns [0, Main] (3561)       "dcoDevice": "/dev/ptp0",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672547452 ns [0, Main] (3561)       "tsDevice":  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672567862 ns [0, Main] (3561)       [  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672589392 ns [0, Main] (3561)           {  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672610302 ns [0, Main] (3561)               "tsDeviceName": "/dev/ptp1",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672632242 ns [0, Main] (3561)               "tsDevicePinIndex": -1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672655603 ns [0, Main] (3561)               "tsDeviceExttsChannel": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672677353 ns [0, Main] (3561)               "tsDeviceExttsCorrectionNs": 0  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672698783 ns [0, Main] (3561)           }  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672719383 ns [0, Main] (3561)       ],  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672245749 ns [0, Main] (3561) Configuration file: /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672739674 ns [0, Main] (3561)       "charDevice": "/dev/rsmu0",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672760924 ns [0, Main] (3561)       "phaseSnapDelaySeconds": 3,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672782274 ns [0, Main] (3561)       "tsCalibrationEnable": 0  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672804134 ns [0, Main] (3561)   },  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672824414 ns [0, Main] (3561)     
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672844275 ns [0, Main] (3561)   "deviceConfig":  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672864675 ns [0, Main] (3561)   {  
-    
-    Starting RE PTP with external Linux stack...
-    RE PTP Software Release ID = 4.3.1.390841, Commit ID = 3299c31d457548b46ebd2a40127622a953f5088c
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672888315 ns [0, Main] (3561)       "oscillatorType": "Tcxo",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672951826 ns [0, Main] (3561)       "dpll1588Instance": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672974496 ns [0, Main] (3561)       "tsDeviceAlignmentDisable": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 672996136 ns [0, Main] (3561)       "holdover":  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 673018956 ns [0, Main] (3561)       {  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 673039067 ns [0, Main] (3561)           "holdoverType": "HardwareEnhanced",  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 673060957 ns [0, Main] (3561)           "holdoverLossPhysicalOosEnable": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 673083667 ns [0, Main] (3561)           "holdoverTimeoutSeconds": 1000,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 673105027 ns [0, Main] (3561)           "holdoverQualificationSeconds": 100,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 673126817 ns [0, Main] (3561)           "unqualifiedTimeoutSeconds": 10000,  
-    RE::SyncAnalysis: 2024-09-19 10:26:45 673148658 ns [0, Main] (3561)           "outOfSpecUserDefinedFrequencyOffsetEnable": 0,  
-    ptp4l[58793.343]: master offset    2896114 s0 freq      +0 path delay        78
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006519602 ns [0, Main] (3561)           "outOfSpecUserDefinedFrequencyOffsetPpb": 0  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006548692 ns [0, Main] (3561)       }  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006570612 ns [0, Main] (3561)   },  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006591203 ns [0, Main] (3561)   "profileConfig":  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006612003 ns [0, Main] (3561)   {  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006632043 ns [0, Main] (3561)       "physicalPllClockCategory": 4,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006654923 ns [0, Main] (3561)       "physicalPllClockCategoryThreshold": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006676593 ns [0, Main] (3561)       "physicalPllInstance": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006697694 ns [0, Main] (3561)       "physicalPllWaitToRestoreTimeoutValue": 10  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006720014 ns [0, Main] (3561)   },  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006740894 ns [0, Main] (3561)     
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006760804 ns [0, Main] (3561)   "loggerConfig":  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006782065 ns [0, Main] (3561)   {  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006803015 ns [0, Main] (3561)       "stdoutLog":  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006824055 ns [0, Main] (3561)       {  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006844575 ns [0, Main] (3561)           "enable": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006865675 ns [0, Main] (3561)           "selectionMask": "0000000000011111",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006887396 ns [0, Main] (3561)           "_description_": "        | ||||||___ 0: Sync error                ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006911656 ns [0, Main] (3561)           "_description_": "        | |||||____ 1: Sync warning              ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006934616 ns [0, Main] (3561)           "_description_": "        | ||||_____ 2: Sync analysis             ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006957526 ns [0, Main] (3561)           "_description_": "        | |||______ 3: Error                     ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 006981057 ns [0, Main] (3561)           "_description_": "        | ||_______ 4: Warning                   ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007004607 ns [0, Main] (3561)           "_description_": "        | |________ 5: Debug                     ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007027857 ns [0, Main] (3561)           "_description_": "        |__________ 7: Timestamp                 "  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007050827 ns [0, Main] (3561)       },  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007071587 ns [0, Main] (3561)         
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007091978 ns [0, Main] (3561)       "externalFdLog":  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007113038 ns [0, Main] (3561)       {  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007133558 ns [0, Main] (3561)           "enable": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007154478 ns [0, Main] (3561)           "selectionMask": "0000000000011111",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007176368 ns [0, Main] (3561)           "_description_": "        | ||||||___ 0: Sync error                ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007199129 ns [0, Main] (3561)           "_description_": "        | |||||____ 1: Sync warning              ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007221499 ns [0, Main] (3561)           "_description_": "        | ||||_____ 2: Sync analysis             ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 007244359 ns [0, Main] (3561)           "_description_": "        | |||______ 3: Error                     ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340612983 ns [0, Main] (3561)           "_description_": "        | ||_______ 4: Warning                   ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340640754 ns [0, Main] (3561)           "_description_": "        | |________ 5: Debug                     ",  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340664804 ns [0, Main] (3561)           "_description_": "        |__________ 7: Timestamp                 "  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340687534 ns [0, Main] (3561)       }  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340707644 ns [0, Main] (3561)   },  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340727884 ns [0, Main] (3561)     
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340748265 ns [0, Main] (3561)   "instanceConfig":  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340768825 ns [0, Main] (3561)   [  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340788815 ns [0, Main] (3561)       {  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340808805 ns [0, Main] (3561)           "correctionFieldEnable": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340830256 ns [0, Main] (3561)           "lostMasterTimeoutMilliseconds": 2000,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340852076 ns [0, Main] (3561)           "manageClockClassEnable": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340873446 ns [0, Main] (3561)           "manageClockClassExtendedEnable": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340894766 ns [0, Main] (3561)           "ptpDomainNumber": -1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340916516 ns [0, Main] (3561)           "numberOfTrackerInstances": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340937937 ns [0, Main] (3561)             
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340958077 ns [0, Main] (3561)           "trackerConfig":  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 340979277 ns [0, Main] (3561)           {  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341000487 ns [0, Main] (3561)             "delayAsymmetryNanoseconds": 0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341021897 ns [0, Main] (3561)             "phaseSnapThresholdSeconds": 0.00001,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341043588 ns [0, Main] (3561)             "floorDelayEstimateSeconds": -1.0,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341064828 ns [0, Main] (3561)             "timeLockThresholdNanoseconds": 100,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341087018 ns [0, Main] (3561)             "willCorrectFrequencyAtFirstSnap": 1,  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341108488 ns [0, Main] (3561)             "frequencyLockThresholdPpb": 16.0,   
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341130339 ns [0, Main] (3561)             "lockFilterWindowLengthSeconds": 1.0  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341151929 ns [0, Main] (3561)           }  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341172459 ns [0, Main] (3561)       }  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341192669 ns [0, Main] (3561)   ]  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 341213059 ns [0, Main] (3561) }  
-    RE::Warning: 2024-09-19 10:26:46 341233040 ns [0, Main] (5060) ** Alert - the following values are non default:  
-    RE::Warning: 2024-09-19 10:26:46 341255010 ns [0, Main] (5060) ** referenceTrackerType = 2 **  
-    RE::Warning: 2024-09-19 10:26:46 341275660 ns [0, Main] (5060) ** phc4lConfig.dcoDevice = /dev/ptp0 **  
-    RE::Warning: 2024-09-19 10:26:46 341296810 ns [0, Main] (5060) ** phc4lConfig.phaseSnapDelaySeconds = 3 **  
-    RE::Warning: 2024-09-19 10:26:46 341317900 ns [0, Main] (5060) ** deviceConfig.oscillatorType = 0 **  
-    RE::Warning: 2024-09-19 10:26:46 341339051 ns [0, Main] (5060) ** deviceConfig.dpll1588Instance = 1 **  
-    RE::Warning: 2024-09-19 10:26:46 341360401 ns [0, Main] (5060) ** phc4lConfig.tsDevice[0] = /dev/ptp1 **  
-    RE::Warning: 2024-09-19 10:26:46 341381371 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverType = 2 **  
-    RE::Warning: 2024-09-19 10:26:46 674707025 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverTimeoutSeconds = 1000 **  
-    RE::Warning: 2024-09-19 10:26:46 674732125 ns [0, Main] (5060) ** profileConfig.physicalPllClockCategory = 4 **  
-    RE::Warning: 2024-09-19 10:26:46 674754555 ns [0, Main] (5060) ** profileConfig.physicalPllInstance = 0 **  
-    RE::Warning: 2024-09-19 10:26:46 674776305 ns [0, Main] (5060) ** The following non default reference tracker parameters are for stack instance 0 (each reference tracker configuration is identical) **  
-    RE::Warning: 2024-09-19 10:26:46 674801176 ns [0, Main] (5060) ** instanceConfig.trackerConfig.willCorrectFrequencyAtFirstSnap = 1 **  
-    RE::Warning: 2024-09-19 10:26:46 674823786 ns [0, Main] (5060) ** instanceConfig.trackerConfig.frequencyLockThresholdPpb = 16.000000 **  
-    RE::Warning: 2024-09-19 10:26:46 674846966 ns [0, Main] (5060) ** instanceConfig.trackerConfig.timeLockThresholdNanoseconds = 100.000000 **  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 674891007 ns [0, Main] (3102) Configuring IDT Phc4l timestamper (/dev/ptp1).
-      
-    RE::SyncAnalysis: 2024-09-19 10:26:46 674926867 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> Start.  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 674948657 ns [0, Main] (3579) QR: Qualified reference is not supported (PTP monitoring configuration is not valid and reference tracker type configuration is not valid)  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 674973407 ns [0, Main] (3004) RE PTP Software Release ID: 4.3.1.390841 & Commit ID: 3299c31d457548b46ebd2a40127622a953f5088c.  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 675018588 ns [3, Supervisor] (3101) Configuring Phc4l device driver (/dev/ptp0).  
-    RE::SyncAnalysis: 2024-09-19 10:26:46 675039978 ns [3, Supervisor] (3236) phc4l initialization: set initial FFO value to -35 ppb.  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 679983419 ns [3, Supervisor] (3220) HW device configuration complete.  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 680048890 ns [3, Supervisor] (3153) Clock category changed:  E_CATEGORY_INVALID (6) -> E_CATEGORY4 (4).  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 680439764 ns [3, Supervisor] (3562) Set combo mode Hold/Freeze  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 681352443 ns [3, Supervisor] (3521) Sync-e Supervisor state: Unqualified  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 681381363 ns [3, Supervisor] (3520) Sync-e Supervisor is started.  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 681431334 ns [3, Supervisor] (3066) LO state: 'Initial' to 'Free Run'    Event: 'LO initialized'.  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 681813087 ns [4, S0.Tracker#0] (3252) Tracker run mode: 'Snapping'     3165.  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 681919308 ns [3, Supervisor] (3225) Register tracker S0.Tracker#0: stack instance number 0; reference tracker instance number 0  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 682226212 ns [5, MngIf] (3049) Listening on IP Address 127.0.0.1 on port 2400.  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 684504814 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestDefaultDataSet.  
-    
-    Stack instance 0 Default data set received:
-    	 twoStep:     1
-    	 clockId:     1a:f5:08:ff:fe:6c:05:71
-    	 ports:       1
-    	 clkClass:    255
-    	 clkAccur:    254
-    	 clkScldVar:  65535
-    	 prio1:       128
-    	 prio2:       255
-    	 domain:      24
-    	 slaveOnly:   1
-    RE::SyncAnalysis: 2024-09-19 10:26:47 692560225 ns [0, Main] (3279) CCM: disabled    (Initial clockClass: 255, JSON: manageClockClassEnable 1, manageClockClassExtendedEnable 0)  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 696364113 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestParentDataSet.  
-    
-    Stack instance 0 Parent data set received:
-    	 parentPortId: e2:93:dd:ff:fe:d9:44:a5.1
-    	 parentStats:   0
-    	 oposlv:        65535
-    	 opcpcr:        2147483647
-    	 gmPriority1:   128
-    	 gmPriority2:   255
-    	 clkClass:      248
-    	 clkAccur:      254
-    	 clkScldVar:    65535
-    	 gmClockId:     e2:93:dd:ff:fe:d9:44:a5
-    RE::SyncAnalysis: 2024-09-19 10:26:47 708367213 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestTimePropertiesDataSet.  
-    
-    Stack instance 0 Time Properties data set received:
-    	 curUtcOffs:     37
-    	 tmSrc:          160
-    	 leap_61:        0
-    	 leap_59:        0
-    	 curUtcOffsVal:  0
-    	 ptpTmScale:     1
-    	 timeTraceable:  0
-    	 freqTraceable:  0
-    RE::SyncAnalysis: 2024-09-19 10:26:47 720363853 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestClockDescription.  
-    
-    Stack instance 0 Clock Description 0 received:
-    	 clockType:           OC   
-    	 phyLayerProtocol:    IEEE 802.3
-    	 phyAddress:          1A: F5: 08: 6C: 05: 71: 
-    	 protocolAddress:     IEEE 802.3:  1a:f5:08:6c:05:71
-    	 manufacturer id:     000000
-    	 productDescription:  ;;
-    	 revision:            ;;
-    	 userDescription:     
-    	 profile id:          0019a7010203
-    RE::SyncAnalysis: 2024-09-19 10:26:47 732367823 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestPortDataSet.  
-    
-    Stack instance 0 Port data set 0 received:
-    	 port identity:         1a:f5:08:ff:fe:6c:05:71.1
-    	 port state:            UNCALIBRATED
-    	 logMinDelReqIntv:      -4
-    	 p2pMeanPathDel:        0
-    	 logAnnounceIntv:       -3
-    	 announceReceiptTmout:  3
-    	 logSyncIntv:           -4
-    	 delay mechanism:       1
-    	 logMinPDelReqIntv:     0
-    	 versionNumber:         2
-    RE::SyncAnalysis: 2024-09-19 10:26:47 744691336 ns [0, Main] (3221) Timestamper device eth1 is used by external Linux stack  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 744740167 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> Running.  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 748395273 ns [3, Supervisor] (3280) Notified frequency traceability for stack instance 0: 0  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 788388633 ns [0, Main] (3283) Inserted master information list node: actual e2:93:dd:ff:fe:d9:44:a5.1; local stack 1a:f5:08:ff:fe:6c:05:71.0  
-    RE::SyncAnalysis: 2024-09-19 10:26:47 788423354 ns [0, Main] (3268) Instance 0: e2:93:dd:ff:fe:d9:44:a5.1 state transition --> WaitTimestamps  
-    ptp4l[58795.343]: master offset    2896105 s0 freq      -5 path delay        76
-    RE::SyncAnalysis: 2024-09-19 10:26:48 681584377 ns [0, Main] (3524) Sync-e Supervisor: physical clock category changed to 4  
-    RE::SyncAnalysis: 2024-09-19 10:26:48 681655847 ns [0, Main] (3525) Sync-e Supervisor: physical clock category threshold changed to 1  
-    RE::SyncWarning: 2024-09-19 10:26:48 681681268 ns [0, Main] (2190) Sync-e Supervisor: physical clock category (4) does not meet the threshold (1)  
-    ptp4l[58797.344]: master offset    2896086 s0 freq     -10 path delay        77
-    ptp4l[58799.345]: master offset    2896067 s0 freq      -8 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:26:51 916399700 ns [0, Main] (3268) Instance 0: e2:93:dd:ff:fe:d9:44:a5.1 state transition --> UpdateMasterInfo  
-    RE::SyncError: 2024-09-19 10:26:51 920373740 ns [0, Main] (1128) Stack instance 0, master e2:93:dd:ff:fe:d9:44:a5.1 is not in uncalibrated or slave state  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 920422470 ns [0, Main] (3275) Single path active: 0.  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 920444600 ns [0, Main] (3223) Measured sync interval is 62500 us for master e2:93:dd:ff:fe:d9:44:a5.1  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 920467511 ns [0, Main] (3224) Measured delay request interval is 62500 us for master e2:93:dd:ff:fe:d9:44:a5.1  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 920490631 ns [0, Main] (3268) Instance 0: e2:93:dd:ff:fe:d9:44:a5.1 state transition --> Running  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 948451150 ns [3, Supervisor] (3258) Stack instance 0: Attempt to register new master e2:93:dd:ff:fe:d9:44:a5.1 with best master e2:93:dd:ff:fe:d9:44:a5.1  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 948489751 ns [3, Supervisor] (3260) Stack instance 0, tracker instance 0: Allocated new tracker S0.Tracker#0.  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 948514341 ns [3, Supervisor] (3125) Assign tracker S0.Tracker#0 to track e2:93:dd:ff:fe:d9:44:a5.1  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 948538791 ns [3, Supervisor] (3123) 1588 reference acquired, S0.Tracker#0 is the chosen tracker (e2:93:dd:ff:fe:d9:44:a5.1)  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 948562962 ns [3, Supervisor] (3066) LO state: 'Free Run' to 'Lock Acquisition'    Event: 'LO reference acquired'.  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 948605372 ns [4, S0.Tracker#0] (3276) processSinglePathInfo: Single path active = 0.  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 948638122 ns [4, S0.Tracker#0 *] (3252) Tracker run mode: 'Snapping'     3164.  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 968470501 ns [0, Main] (3285) Best master changed from 00:00:00:00:00:00:00:00.0 to e2:93:dd:ff:fe:d9:44:a5.1  
-    RE::SyncAnalysis: 2024-09-19 10:26:51 968512811 ns [3, Supervisor] (3124) Best master is the same: e2:93:dd:ff:fe:d9:44:a5.1, chosen tracker: S0.Tracker#0.  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 289237259 ns [3, Supervisor] (3109) Corrected: 0.000000 ppb from S0.Tracker#0    Total Aged/Raw: 0.000000 / 0.000000 ppb.  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 291244769 ns [4, S0.Tracker#0 *] (3204) snapSubStage: 'Initial' to 'Frequency Measurements'.  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 291280539 ns [4, S0.Tracker#0 *] (3240) offset: 2896069.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 352408321 ns [4, S0.Tracker#0 *] (3240) offset: 2896069.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 412407361 ns [4, S0.Tracker#0 *] (3240) offset: 2896069.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 476407061 ns [4, S0.Tracker#0 *] (3240) offset: 2896066.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 540408321 ns [4, S0.Tracker#0 *] (3240) offset: 2896065.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 600404651 ns [4, S0.Tracker#0 *] (3240) offset: 2896065.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 664407131 ns [4, S0.Tracker#0 *] (3240) offset: 2896063.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 724507482 ns [4, S0.Tracker#0 *] (3240) offset: 2896063.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 788409761 ns [4, S0.Tracker#0 *] (3240) offset: 2896063.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 852408521 ns [4, S0.Tracker#0 *] (3240) offset: 2896064.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 912408742 ns [4, S0.Tracker#0 *] (3240) offset: 2896064.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:52 976408112 ns [4, S0.Tracker#0 *] (3240) offset: 2896064.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 040405732 ns [4, S0.Tracker#0 *] (3240) offset: 2896064.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 100405462 ns [4, S0.Tracker#0 *] (3240) offset: 2896062.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 164407522 ns [4, S0.Tracker#0 *] (3240) offset: 2896061.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 228406942 ns [4, S0.Tracker#0 *] (3240) offset: 2896060.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 288408312 ns [4, S0.Tracker#0 *] (3240) offset: 2896060.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 352405612 ns [4, S0.Tracker#0 *] (3240) offset: 2896060.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 412407492 ns [4, S0.Tracker#0 *] (3240) offset: 2896059.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 476408342 ns [4, S0.Tracker#0 *] (3240) offset: 2896058.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 540417933 ns [4, S0.Tracker#0 *] (3240) offset: 2896056.5 ns    delay: 77.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 600405253 ns [4, S0.Tracker#0 *] (3240) offset: 2896057.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 664409953 ns [4, S0.Tracker#0 *] (3240) offset: 2896057.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 728410573 ns [4, S0.Tracker#0 *] (3240) offset: 2896056.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 788407953 ns [4, S0.Tracker#0 *] (3240) offset: 2896057.5 ns    delay: 76.5 ns  
-    ptp4l[58801.346]: master offset    2896059 s0 freq      -4 path delay        76
-    RE::SyncAnalysis: 2024-09-19 10:26:53 852408993 ns [4, S0.Tracker#0 *] (3240) offset: 2896059.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 912511604 ns [4, S0.Tracker#0 *] (3240) offset: 2896058.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:53 976408113 ns [4, S0.Tracker#0 *] (3240) offset: 2896058.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 040408753 ns [4, S0.Tracker#0 *] (3240) offset: 2896056.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 100406753 ns [4, S0.Tracker#0 *] (3240) offset: 2896056.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 164406403 ns [4, S0.Tracker#0 *] (3240) offset: 2896054.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 228410294 ns [4, S0.Tracker#0 *] (3240) offset: 2896053.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 288407764 ns [4, S0.Tracker#0 *] (3240) offset: 2896050.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 352406924 ns [4, S0.Tracker#0 *] (3240) offset: 2896050.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 416409874 ns [4, S0.Tracker#0 *] (3240) offset: 2896048.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 476414114 ns [4, S0.Tracker#0 *] (3240) offset: 2896049.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 540409544 ns [4, S0.Tracker#0 *] (3240) offset: 2896049.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 600405494 ns [4, S0.Tracker#0 *] (3240) offset: 2896048.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 664407114 ns [4, S0.Tracker#0 *] (3240) offset: 2896048.5 ns    delay: 77.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 728414344 ns [4, S0.Tracker#0 *] (3240) offset: 2896047.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 788407574 ns [4, S0.Tracker#0 *] (3240) offset: 2896046.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 852405875 ns [4, S0.Tracker#0 *] (3240) offset: 2896046.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 916408825 ns [4, S0.Tracker#0 *] (3240) offset: 2896045.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:54 976409265 ns [4, S0.Tracker#0 *] (3240) offset: 2896043.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 040407285 ns [4, S0.Tracker#0 *] (3240) offset: 2896045.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 100415725 ns [4, S0.Tracker#0 *] (3240) offset: 2896044.5 ns    delay: 75.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 164408945 ns [4, S0.Tracker#0 *] (3240) offset: 2896044.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 228408255 ns [4, S0.Tracker#0 *] (3240) offset: 2896044.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 288407945 ns [4, S0.Tracker#0 *] (3240) offset: 2896044.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 352407605 ns [4, S0.Tracker#0 *] (3240) offset: 2896044.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 416408185 ns [4, S0.Tracker#0 *] (3240) offset: 2896044.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 476409366 ns [4, S0.Tracker#0 *] (3240) offset: 2896044.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 540405136 ns [4, S0.Tracker#0 *] (3240) offset: 2896043.5 ns    delay: 77.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 604407046 ns [4, S0.Tracker#0 *] (3240) offset: 2896041.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 664408536 ns [4, S0.Tracker#0 *] (3240) offset: 2896041.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 728412186 ns [4, S0.Tracker#0 *] (3240) offset: 2896040.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 788413526 ns [4, S0.Tracker#0 *] (3240) offset: 2896038.5 ns    delay: 76.5 ns  
-    ptp4l[58803.346]: master offset    2896039 s0 freq     -10 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:26:55 852407856 ns [4, S0.Tracker#0 *] (3240) offset: 2896039.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 916410366 ns [4, S0.Tracker#0 *] (3240) offset: 2896038.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:55 976410136 ns [4, S0.Tracker#0 *] (3240) offset: 2896038.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 040407296 ns [4, S0.Tracker#0 *] (3240) offset: 2896037.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 104406026 ns [4, S0.Tracker#0 *] (3240) offset: 2896038.5 ns    delay: 77.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 164409857 ns [4, S0.Tracker#0 *] (3240) offset: 2896038.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 228409387 ns [4, S0.Tracker#0 *] (3240) offset: 2896036.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 288426977 ns [4, S0.Tracker#0 *] (3240) offset: 2896036.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 352406747 ns [4, S0.Tracker#0 *] (3240) offset: 2896036.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 416411497 ns [4, S0.Tracker#0 *] (3240) offset: 2896036.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 476406897 ns [4, S0.Tracker#0 *] (3240) offset: 2896034.5 ns    delay: 75.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 540441028 ns [4, S0.Tracker#0 *] (3240) offset: 2896034.5 ns    delay: 75.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 604413047 ns [4, S0.Tracker#0 *] (3240) offset: 2896032.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 664408907 ns [4, S0.Tracker#0 *] (3240) offset: 2896030.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 728412558 ns [4, S0.Tracker#0 *] (3240) offset: 2896030.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 792410218 ns [4, S0.Tracker#0 *] (3240) offset: 2896029.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 852407078 ns [4, S0.Tracker#0 *] (3240) offset: 2896029.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 916409088 ns [4, S0.Tracker#0 *] (3240) offset: 2896028.5 ns    delay: 77.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:56 976407148 ns [4, S0.Tracker#0 *] (3240) offset: 2896029.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:57 040410448 ns [4, S0.Tracker#0 *] (3240) offset: 2896029.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:57 104406538 ns [4, S0.Tracker#0 *] (3240) offset: 2896029.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:57 164410458 ns [4, S0.Tracker#0 *] (3240) offset: 2896029.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:57 228408988 ns [4, S0.Tracker#0 *] (3240) offset: 2896029.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:26:57 292413018 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 4.94 seconds.  
-    RE::SyncAnalysis: 2024-09-19 10:26:57 292484059 ns [3, Supervisor] (3213) Sync time of day: -0.002896028 s  
-    ptp4l[58805.347]: master offset        -10 s0 freq -1449556 path delay        76
-    ptp4l[58807.348]: master offset        -20 s0 freq      -4 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:27:00 702653206 ns [3, Supervisor] (3121) Corrected: -0.002896028 s from S0.Tracker#0    Max FFO req/gnt: -1.000000 / -1.000000 ppb.  
-    RE::SyncAnalysis: 2024-09-19 10:27:01 728435056 ns [4, S0.Tracker#0 *] (3240) offset: 101999.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:01 792409985 ns [4, S0.Tracker#0 *] (3240) offset: 101998.0 ns    delay: 77.0 ns  
-    ptp4l[58809.349]: master offset     101997 s0 freq  +50986 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:27:01 856404815 ns [4, S0.Tracker#0 *] (3240) offset: 101997.0 ns    delay: 76.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:01 916407066 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.19 seconds.  
-    RE::SyncAnalysis: 2024-09-19 10:27:01 917317385 ns [3, Supervisor] (3109) Corrected: 25.217095 ppb from S0.Tracker#0    Total Aged/Raw: 25.217095 / 25.217095 ppb.  
-    RE::SyncAnalysis: 2024-09-19 10:27:01 919362685 ns [3, Supervisor] (3213) Sync time of day: -0.000101995 s  
-    ptp4l[58811.349]: master offset    -101941 s0 freq -101940 path delay        76
-    RE::SyncAnalysis: 2024-09-19 10:27:05 722959137 ns [3, Supervisor] (3121) Corrected: -0.000101995 s from S0.Tracker#0    Max FFO req/gnt: -1.000000 / -1.000000 ppb.  
-    ptp4l[58813.350]: master offset         89 s0 freq  +50993 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:27:06 792502344 ns [4, S0.Tracker#0 *] (3240) offset: 109.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:06 856407573 ns [4, S0.Tracker#0 *] (3240) offset: 110.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:06 920404063 ns [4, S0.Tracker#0 *] (3240) offset: 110.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:06 980408243 ns [4, S0.Tracker#0 *] (3240) offset: 113.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:07 044407294 ns [4, S0.Tracker#0 *] (3240) offset: 113.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:07 108405144 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.31 seconds.  
-    RE::SyncAnalysis: 2024-09-19 10:27:07 108482544 ns [3, Supervisor] (3214) Phase pull-in:  -114 ns. blocking 1.  
-    RE::SyncAnalysis: 2024-09-19 10:27:07 222744197 ns [3, Supervisor] (3121) Corrected: -0.000000114 s from S0.Tracker#0    Max FFO req/gnt: 1000.000000 / 1000.000000 ppb.  
-    ptp4l[58815.351]: master offset         20 s0 freq     -34 path delay        76
-    RE::SyncAnalysis: 2024-09-19 10:27:08 296428466 ns [4, S0.Tracker#0 *] (3240) offset: 30.0 ns    delay: 78.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:08 356407806 ns [4, S0.Tracker#0 *] (3240) offset: 32.5 ns    delay: 77.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:08 420403786 ns [4, S0.Tracker#0 *] (3240) offset: 34.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:08 484410696 ns [4, S0.Tracker#0 *] (3240) offset: 36.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:08 544407836 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.25 seconds.  
-    RE::SyncAnalysis: 2024-09-19 10:27:08 545146793 ns [3, Supervisor] (3109) Corrected: -28.611719 ppb from S0.Tracker#0    Total Aged/Raw: -28.611719 / -28.611719 ppb.  
-    RE::SyncAnalysis: 2024-09-19 10:27:08 547191694 ns [3, Supervisor] (3214) Phase pull-in:  -39 ns. blocking 1.  
-    RE::SyncAnalysis: 2024-09-19 10:27:08 586379766 ns [3, Supervisor] (3121) Corrected: -0.000000039 s from S0.Tracker#0    Max FFO req/gnt: 1000.000000 / 1000.000000 ppb.  
-    RE::SyncAnalysis: 2024-09-19 10:27:09 608426578 ns [4, S0.Tracker#0 *] (3240) offset: -14.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:09 672405008 ns [4, S0.Tracker#0 *] (3240) offset: -14.5 ns    delay: 76.5 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:09 732409408 ns [4, S0.Tracker#0 *] (3240) offset: -15.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:09 796409948 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.19 seconds.  
-    RE::SyncError: 2024-09-19 10:27:09 796476019 ns [4, S0.Tracker#0 *] (1056) Startup FFO correction failed, PDV exceeded tolerance: +/- 0 ppb  
-    RE::SyncAnalysis: 2024-09-19 10:27:09 796500939 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Snapping' to 'Converging'     3160.  
-    ptp4l[58817.352]: master offset        -14 s0 freq     -17 path delay        76
-    RE::SyncAnalysis: 2024-09-19 10:27:10 732434340 ns [4, S0.Tracker#0 *] (3240) offset: -12.0 ns    delay: 77.0 ns  
-    RE::SyncAnalysis: 2024-09-19 10:27:11 732441371 ns [4, S0.Tracker#0 *] (3240) offset: -12.5 ns    delay: 76.5 ns  
-    ptp4l[58819.353]: master offset        -13 s0 freq      +1 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:27:12 044524393 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Converging' to 'Statistics Collecting'     3159.  
-    RE::SyncAnalysis: 2024-09-19 10:27:12 044919626 ns [3, Supervisor] (3066) LO state: 'Lock Acquisition' to 'Frequency Locked'    Event: 'LO frequency locked'.  
-    RE::SyncAnalysis: 2024-09-19 10:27:12 045018767 ns [3, Supervisor] (3066) LO state: 'Frequency Locked' to 'Time Locked'    Event: 'LO time locked'.  
-    ptp4l[58819.603]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
-    ptp4l[58821.353]: master offset        -11 s2 freq      +1 path delay        78
-    ptp4l[58823.354]: master offset        -26 s2 freq      -7 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:27:16 736442609 ns [4, S0.Tracker#0 *] (3240) offset: -22.0 ns    delay: 76.0 ns  
-    ptp4l[58825.355]: master offset        -20 s2 freq      +2 path delay        77
-    ptp4l[58827.356]: master offset        -11 s2 freq      +4 path delay        76
-    RE::SyncAnalysis: 2024-09-19 10:27:21 736444087 ns [4, S0.Tracker#0 *] (3240) offset: -13.0 ns    delay: 77.0 ns  
-    ptp4l[58829.356]: master offset        -13 s2 freq      -0 path delay        77
-    ptp4l[58831.357]: master offset        -14 s2 freq      +0 path delay        78
-    ptp4l[58833.358]: master offset         -7 s2 freq      +2 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:27:26 740442905 ns [4, S0.Tracker#0 *] (3240) offset: -10.5 ns    delay: 77.5 ns  
-    ptp4l[58835.359]: master offset         -7 s2 freq      +0 path delay        77
-    ptp4l[58837.359]: master offset         -3 s2 freq      +1 path delay        77
-    RE::SyncAnalysis: 2024-09-19 10:27:31 740444382 ns [4, S0.Tracker#0 *] (3240) offset: -2.5 ns    delay: 76.5 ns  
-    ptp4l[58839.360]: master offset         -2 s2 freq      +0 path delay        76
-    ptp4l[58841.361]: master offset         -1 s2 freq      +0 path delay        77    
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880301365 ns [0, Main] (3561) RE PTP Software Release ID = 4.3.4.518632, Commit ID = 07229d8c4548eebfbdb068ff4fef304398b817ba    Jul 31 2025  12:40:52  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880378016 ns [0, Main] (3561) Configuration file: /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880402616 ns [0, Main] (3561) {  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880423636 ns [0, Main] (3561)   "versionId": "4.3",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880448506 ns [0, Main] (3561)   "testModeEnable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880472407 ns [0, Main] (3561)   "referenceTrackerType": "WritePhase",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880497967 ns [0, Main] (3561)   "remoteUdsAddress": "/var/run/ptp4l",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880520487 ns [0, Main] (3561)   "localUdsAddress": "/var/run/pcm4l",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880541877 ns [0, Main] (3561)   "mngApiTimeoutMilliseconds": 100,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880563937 ns [0, Main] (3561)   "stepWindowSeconds": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880588208 ns [0, Main] (3561)   "phc4lConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880610668 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880632038 ns [0, Main] (3561)       "dcoDevice": "/dev/ptp0",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880652458 ns [0, Main] (3561)       "tsDevice":  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880672279 ns [0, Main] (3561)       [  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880692139 ns [0, Main] (3561)           {  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880711629 ns [0, Main] (3561)               "tsDeviceName": "/dev/ptp1",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880733349 ns [0, Main] (3561)               "tsDevicePinIndex": -1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880754009 ns [0, Main] (3561)               "tsDeviceExttsChannel": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880775270 ns [0, Main] (3561)               "tsDeviceExttsCorrectionNs": -434  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880797960 ns [0, Main] (3561)           }  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880817890 ns [0, Main] (3561)       ],  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880837470 ns [0, Main] (3561)       "charDevice": "/dev/rsmu0",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880858230 ns [0, Main] (3561)       "phaseSnapDelaySeconds": 3,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880878561 ns [0, Main] (3561)       "tsCalibrationEnable": 0  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880898771 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880918341 ns [0, Main] (3561)     
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880937661 ns [0, Main] (3561)   "deviceConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880960071 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880979672 ns [0, Main] (3561)       "oscillatorType": "Tcxo",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 880999922 ns [0, Main] (3561)       "dpll1588Instance": 1,  
+	
+	Starting RE PTP with external Linux stack...
+	RE PTP Software Release ID = 4.3.4.518632, Commit ID = 07229d8c4548eebfbdb068ff4fef304398b817ba
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881019862 ns [0, Main] (3561)       "tsDeviceAlignmentDisable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881080203 ns [0, Main] (3561)       "holdover":  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881110133 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881131703 ns [0, Main] (3561)           "holdoverType": "HardwareEnhanced",  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881152363 ns [0, Main] (3561)           "holdoverLossPhysicalOosEnable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881173454 ns [0, Main] (3561)           "holdoverTimeoutSeconds": 1000,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881194264 ns [0, Main] (3561)           "holdoverQualificationSeconds": 100,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881218594 ns [0, Main] (3561)           "unqualifiedTimeoutSeconds": 10000,  
+	RE::SyncAnalysis: 2025-09-24 13:04:36 881249254 ns [0, Main] (3561)           "outOfSpecUserDefinedFrequencyOffsetEnable": 0,  
+	ptp4l[1554.862]: master offset 1758718775620076571 s0 freq     +26 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214575438 ns [0, Main] (3561)           "outOfSpecUserDefinedFrequencyOffsetPpb": 0  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214605238 ns [0, Main] (3561)       }  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214625749 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214645839 ns [0, Main] (3561)   "profileConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214666519 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214686159 ns [0, Main] (3561)       "physicalPllClockCategory": 4,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214707719 ns [0, Main] (3561)       "physicalPllClockCategoryThreshold": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214729120 ns [0, Main] (3561)       "physicalPllInstance": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214749950 ns [0, Main] (3561)       "physicalPllWaitToRestoreTimeoutValue": 10  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214771070 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214790740 ns [0, Main] (3561)     
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214810190 ns [0, Main] (3561)   "loggerConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214829821 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214848991 ns [0, Main] (3561)       "stdoutLog":  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214869391 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214888861 ns [0, Main] (3561)           "enable": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214908811 ns [0, Main] (3561)           "selectionMask": "0000000000011111",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214929412 ns [0, Main] (3561)           "_description_": "        | ||||||___ 0: Sync error                ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214951932 ns [0, Main] (3561)           "_description_": "        | |||||____ 1: Sync warning              ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214973762 ns [0, Main] (3561)           "_description_": "        | ||||_____ 2: Sync analysis             ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 214995552 ns [0, Main] (3561)           "_description_": "        | |||______ 3: Error                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215017612 ns [0, Main] (3561)           "_description_": "        | ||_______ 4: Warning                   ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215040173 ns [0, Main] (3561)           "_description_": "        | |________ 5: Debug                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215062023 ns [0, Main] (3561)           "_description_": "        |__________ 7: Timestamp                 "  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215084283 ns [0, Main] (3561)       },  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215103853 ns [0, Main] (3561)         
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215123994 ns [0, Main] (3561)       "externalFdLog":  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215144704 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215164544 ns [0, Main] (3561)           "enable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215184684 ns [0, Main] (3561)           "selectionMask": "0000000000011111",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215205364 ns [0, Main] (3561)           "_description_": "        | ||||||___ 0: Sync error                ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215228105 ns [0, Main] (3561)           "_description_": "        | |||||____ 1: Sync warning              ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215250275 ns [0, Main] (3561)           "_description_": "        | ||||_____ 2: Sync analysis             ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 215272415 ns [0, Main] (3561)           "_description_": "        | |||______ 3: Error                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548572899 ns [0, Main] (3561)           "_description_": "        | ||_______ 4: Warning                   ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548599059 ns [0, Main] (3561)           "_description_": "        | |________ 5: Debug                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548622819 ns [0, Main] (3561)           "_description_": "        |__________ 7: Timestamp                 "  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548645209 ns [0, Main] (3561)       }  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548664849 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548684960 ns [0, Main] (3561)     
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548704920 ns [0, Main] (3561)   "instanceConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548725280 ns [0, Main] (3561)   [  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548744640 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548764430 ns [0, Main] (3561)           "correctionFieldEnable": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548785141 ns [0, Main] (3561)           "lostMasterTimeoutMilliseconds": 2000,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548806381 ns [0, Main] (3561)           "manageClockClassEnable": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548827561 ns [0, Main] (3561)           "manageClockClassExtendedEnable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548848591 ns [0, Main] (3561)           "ptpDomainNumber": -1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548868582 ns [0, Main] (3561)           "numberOfTrackerInstances": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548889512 ns [0, Main] (3561)             
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548909072 ns [0, Main] (3561)           "trackerConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548929372 ns [0, Main] (3561)           {  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548949182 ns [0, Main] (3561)             "delayAsymmetryNanoseconds": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548970393 ns [0, Main] (3561)             "phaseSnapThresholdSeconds": 0.00001,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 548991373 ns [0, Main] (3561)             "floorDelayEstimateSeconds": -1.0,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549012203 ns [0, Main] (3561)             "__timeLockThresholdNanoseconds": "Set to 200 to meet enhanced SyncE limits",  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549034403 ns [0, Main] (3561)             "timeLockThresholdNanoseconds": 580,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549055813 ns [0, Main] (3561)             "willCorrectFrequencyAtFirstSnap": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549077334 ns [0, Main] (3561)             "frequencyLockThresholdPpb": 16.0,   
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549098044 ns [0, Main] (3561)             "lockFilterWindowLengthSeconds": 1.0  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549118824 ns [0, Main] (3561)           }  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549138874 ns [0, Main] (3561)       }  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549158204 ns [0, Main] (3561)   ]  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 549177555 ns [0, Main] (3561) }  
+	RE::Warning: 2025-09-24 13:04:37 549196895 ns [0, Main] (5060) ** Alert - the following values are non default:  
+	RE::Warning: 2025-09-24 13:04:37 549217715 ns [0, Main] (5060) ** referenceTrackerType = 2 **  
+	RE::Warning: 2025-09-24 13:04:37 549238205 ns [0, Main] (5060) ** phc4lConfig.dcoDevice = /dev/ptp0 **  
+	RE::Warning: 2025-09-24 13:04:37 549258845 ns [0, Main] (5060) ** phc4lConfig.phaseSnapDelaySeconds = 3 **  
+	RE::Warning: 2025-09-24 13:04:37 549279206 ns [0, Main] (5060) ** deviceConfig.oscillatorType = 0 **  
+	RE::Warning: 2025-09-24 13:04:37 549299806 ns [0, Main] (5060) ** deviceConfig.dpll1588Instance = 1 **  
+	RE::Warning: 2025-09-24 13:04:37 882670470 ns [0, Main] (5060) ** phc4lConfig.tsDevice[0] = /dev/ptp1 **  
+	RE::Warning: 2025-09-24 13:04:37 882695950 ns [0, Main] (5060) ** phc4lConfig.tsDeviceExttsCorrectionNs[0] = -434 **  
+	RE::Warning: 2025-09-24 13:04:37 882718481 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverType = 2 **  
+	RE::Warning: 2025-09-24 13:04:37 882739941 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverTimeoutSeconds = 1000 **  
+	RE::Warning: 2025-09-24 13:04:37 882761641 ns [0, Main] (5060) ** profileConfig.physicalPllClockCategory = 4 **  
+	RE::Warning: 2025-09-24 13:04:37 882782461 ns [0, Main] (5060) ** profileConfig.physicalPllInstance = 0 **  
+	RE::Warning: 2025-09-24 13:04:37 882803581 ns [0, Main] (5060) ** The following non default reference tracker parameters are for stack instance 0 (each reference tracker configuration is identical) **  
+	RE::Warning: 2025-09-24 13:04:37 882827452 ns [0, Main] (5060) ** instanceConfig.trackerConfig.willCorrectFrequencyAtFirstSnap = 1 **  
+	RE::Warning: 2025-09-24 13:04:37 882849172 ns [0, Main] (5060) ** instanceConfig.trackerConfig.frequencyLockThresholdPpb = 16.000000 **  
+	RE::Warning: 2025-09-24 13:04:37 882870852 ns [0, Main] (5060) ** instanceConfig.trackerConfig.timeLockThresholdNanoseconds = 580.000000 **  
+	RE::SyncWarning: 2025-09-24 13:04:37 882904292 ns [0, Main] (2114) Stack instance 0, port 1 not enabled, skip profile checking  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 882943763 ns [0, Main] (3102) Configuring IDT Phc4l timestamper (/dev/ptp1).
+	
+	RE::SyncAnalysis: 2025-09-24 13:04:37 882974203 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> Start.  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 882995093 ns [0, Main] (3579) QR: Qualified reference is not supported  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 883016214 ns [0, Main] (3004) RE PTP Software Release ID: 4.3.4.518632 & Commit ID: 07229d8c4548eebfbdb068ff4fef304398b817ba.  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 883060634 ns [3, Supervisor] (3101) Configuring Phc4l device driver (/dev/ptp0).  
+	RE::SyncAnalysis: 2025-09-24 13:04:37 883081624 ns [3, Supervisor] (3236) phc4l initialization: set initial FFO value to 0 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 087879972 ns [3, Supervisor] (3220) HW device configuration complete.  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 087932993 ns [3, Supervisor] (3153) Clock category changed:  E_CATEGORY_INVALID (6) -> E_CATEGORY4 (4).  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 088348657 ns [3, Supervisor] (3562) Set combo mode Hold/Freeze  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 089247506 ns [3, Supervisor] (3521) Sync-e Supervisor state: Unqualified  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 089279516 ns [3, Supervisor] (3520) Sync-e Supervisor is started.  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 089397958 ns [3, Supervisor] (3066) LO state: 'Initial' to 'Free Run'    Event: 'LO initialized'.  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 089606450 ns [0, Main] (3252) Tracker run mode: 'Snapping'     3165.  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 089875442 ns [3, Supervisor] (3225) Register tracker S0.Tracker#0: stack instance number 0; reference tracker instance number 0  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 090203896 ns [5, MngIf] (3049) Listening on IP Address 127.0.0.1 on port 2400.  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 092300287 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestDefaultDataSet.  
+	
+	Stack instance 0 Default data set received:
+		twoStep:     1
+		clockId:     7e:e5:e1:ff:fe:e1:30:26
+		ports:       1
+		clkClass:    255
+		clkAccur:    254
+		clkScldVar:  65535
+		prio1:       128
+		prio2:       255
+		domain:      24
+		slaveOnly:   1
+	RE::SyncAnalysis: 2025-09-24 13:04:38 100371127 ns [0, Main] (3279) CCM: disabled    (Initial clockClass: 255, JSON: manageClockClassEnable 1, manageClockClassExtendedEnable 0)  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 104164045 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestParentDataSet.  
+	
+	Stack instance 0 Parent data set received:
+		parentPortId: 4a:d1:c5:ff:fe:47:21:fe.1
+		parentStats:   0
+		oposlv:        65535
+		opcpcr:        2147483647
+		gmPriority1:   128
+		gmPriority2:   255
+		clkClass:      248
+		clkAccur:      254
+		clkScldVar:    65535
+		gmClockId:     4a:d1:c5:ff:fe:47:21:fe
+	RE::SyncAnalysis: 2025-09-24 13:04:38 116161185 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestTimePropertiesDataSet.  
+	
+	Stack instance 0 Time Properties data set received:
+		curUtcOffs:     37
+		tmSrc:          160
+		leap_61:        0
+		leap_59:        0
+		curUtcOffsVal:  0
+		ptpTmScale:     1
+		timeTraceable:  0
+		freqTraceable:  0
+	RE::SyncAnalysis: 2025-09-24 13:04:38 128159655 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestClockDescription.  
+	
+	Stack instance 0 Clock Description 0 received:
+		clockType:           OC   
+		phyLayerProtocol:    IEEE 802.3
+		phyAddress:          7E: E5: E1: E1: 30: 26: 
+		protocolAddress:     IEEE 802.3:  7e:e5:e1:e1:30:26
+		manufacturer id:     000000
+		productDescription:  ;;
+		revision:            ;;
+		userDescription:     
+		profile id:          0019a7010203
+	RE::SyncAnalysis: 2025-09-24 13:04:38 140504749 ns [0, Main] (3221) Timestamper device eth1 is used by external Linux stack  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 140552659 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> Running.  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 144189156 ns [3, Supervisor] (3280) Notified frequency traceability for stack instance 0: 0  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 164181936 ns [0, Main] (3283) Inserted master information list node: actual 4a:d1:c5:ff:fe:47:21:fe.1; local stack 7e:e5:e1:ff:fe:e1:30:26.0  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 164226646 ns [0, Main] (3268) Instance 0: 4a:d1:c5:ff:fe:47:21:fe.1 state transition --> WaitGetPortDataSet  
+	RE::Warning: 2025-09-24 13:04:38 224191456 ns [3, Supervisor] (5073) Target port number = 0, override to 1 - check PTP stack is sending non-zero port number when sending timestsamps  
+	RE::SyncAnalysis: 2025-09-24 13:04:38 228225496 ns [2, LinuxExtern] (3268) Instance 0: 4a:d1:c5:ff:fe:47:21:fe.1 state transition --> WaitTimestamps  
+	RE::SyncAnalysis: 2025-09-24 13:04:39 089510710 ns [0, Main] (3524) Sync-e Supervisor: physical clock category changed to 4  
+	RE::SyncAnalysis: 2025-09-24 13:04:39 089582901 ns [0, Main] (3525) Sync-e Supervisor: physical clock category threshold changed to 1  
+	RE::SyncWarning: 2025-09-24 13:04:39 089608391 ns [0, Main] (2190) Sync-e Supervisor: physical clock category (4) does not meet the threshold (1)  
+	ptp4l[1556.863]: master offset 1244709254781 s0 freq +1000000001 path delay       171
+	ptp4l[1558.864]: master offset 1244709254805 s0 freq     +11 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:04:42 356198772 ns [0, Main] (3268) Instance 0: 4a:d1:c5:ff:fe:47:21:fe.1 state transition --> UpdateMasterInfo  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 360166272 ns [0, Main] (3301) Set master timeout to 375 ms for 4a:d1:c5:ff:fe:47:21:fe.1  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 360214412 ns [0, Main] (3275) Single path active: 0.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 360236573 ns [0, Main] (3223) Measured sync interval is 62500 us for master 4a:d1:c5:ff:fe:47:21:fe.1  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 360258783 ns [0, Main] (3224) Measured delay request interval is 62500 us for master 4a:d1:c5:ff:fe:47:21:fe.1  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 360281253 ns [0, Main] (3268) Instance 0: 4a:d1:c5:ff:fe:47:21:fe.1 state transition --> Running  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 380240653 ns [3, Supervisor] (3258) Stack instance 0: Attempt to register new master 4a:d1:c5:ff:fe:47:21:fe.1  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 380290123 ns [3, Supervisor] (3260) Stack instance 0, tracker instance 0: Allocated new tracker S0.Tracker#0.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 380313123 ns [3, Supervisor] (3125) Assign tracker S0.Tracker#0 to track 4a:d1:c5:ff:fe:47:21:fe.1  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 380334744 ns [3, Supervisor] (3126) S0.Tracker#0: New registered master 4a:d1:c5:ff:fe:47:21:fe.1 has clock class 0.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 380367014 ns [4, S0.Tracker#0] (3276) processSinglePathInfo: Single path active = 0.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 400282243 ns [0, Main] (3285) Best master changed from 00:00:00:00:00:00:00:00.0 to 4a:d1:c5:ff:fe:47:21:fe.1  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 400325614 ns [3, Supervisor] (3123) 1588 reference acquired, S0.Tracker#0 is the chosen tracker (4a:d1:c5:ff:fe:47:21:fe.1)  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 400350344 ns [3, Supervisor] (3066) LO state: 'Free Run' to 'Lock Acquisition'    Event: 'LO reference acquired'.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 400397394 ns [4, S0.Tracker#0 *] (3252) Tracker run mode: 'Snapping'     3164.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 665051161 ns [3, Supervisor] (3109) Corrected: 0.000000 ppb from S0.Tracker#0    Total Aged: 0.000000 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 667053601 ns [4, S0.Tracker#0 *] (3204) snapSubStage: 'Initial' to 'Frequency Measurements'.  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 667089012 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254821.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 728203363 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254822.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 788202663 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254822.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 852201403 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254822.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 916213333 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254825.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:42 976205603 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254825.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 040203803 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254825.0 ns    delay: 173.0 ns  
+	ptp4l[1560.864]: master offset 1244709254829 s0 freq     +13 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:04:43 104205724 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254829.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 164208444 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254829.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 228206234 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254829.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 288205604 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254830.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 352207264 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254832.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 416206654 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254831.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 476206614 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254832.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 540205984 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254834.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 604202624 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254835.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 664203534 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254835.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 728205775 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254838.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 788220915 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254838.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 852210505 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254838.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 916211335 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254842.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:43 976208435 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254841.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 040211435 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254844.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 104209645 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254845.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 164207705 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254848.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 228223465 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254850.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 292207625 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254851.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 352207326 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254854.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 416209476 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254854.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 476208806 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254855.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 540208586 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254856.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 604206516 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254857.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 664207116 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254857.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 728208256 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254857.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 792207726 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254857.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 852206536 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254859.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 916207106 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254861.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:44 976206926 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254860.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 040210317 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254861.0 ns    delay: 173.0 ns  
+	ptp4l[1562.865]: master offset 1244709254862 s0 freq     +15 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:04:45 104209257 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254862.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 164208047 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254864.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 228207857 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254864.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 292209167 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254864.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 352206647 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254867.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 416207927 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254867.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 480208577 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254867.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 540206547 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254867.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 604206207 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254870.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 664207098 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254870.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 728223788 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254870.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 792210018 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254871.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 852205778 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254873.5 ns    delay: 173.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 916208258 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254873.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:45 980222118 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254873.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 040209918 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254873.5 ns    delay: 173.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 104207408 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254873.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 164206098 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254875.0 ns    delay: 172.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 228210508 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254877.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 292208879 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254876.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 352206069 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254880.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 416207879 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254880.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 480209549 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254882.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 540210679 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254883.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 604206799 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254883.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 668209779 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254883.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 728209189 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254885.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 792209109 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254886.5 ns    delay: 173.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 852207959 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254886.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 916207360 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254889.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:46 980229100 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254889.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 040210200 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254891.0 ns    delay: 171.0 ns  
+	ptp4l[1564.866]: master offset 1244709254891 s0 freq     +14 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:04:47 104208880 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254891.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 168208450 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254891.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 228210490 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254892.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 292208230 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254892.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 352207100 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254894.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 416207940 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254896.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 480208610 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254895.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 540207850 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254896.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 604220281 ns [4, S0.Tracker#0 *] (3240) offset: 1244709254898.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 668209101 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 4.94 seconds.  
+	RE::SyncAnalysis: 2025-09-24 13:04:47 668278961 ns [3, Supervisor] (3213) Sync time of day: -1244.709254901 s  
+	ptp4l[1566.867]: master offset         -5 s0 freq +1001610008 path delay       171
+	ptp4l[1568.867]: master offset         49 s0 freq     +27 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:04:51 673977315 ns [3, Supervisor] (3121) Corrected: -1244.709254901 s from S0.Tracker#0    Max FFO req/gnt: -1.000000 / -1.000000 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:04:52 732233079 ns [4, S0.Tracker#0 *] (3240) offset: 81.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:52 792208429 ns [4, S0.Tracker#0 *] (3240) offset: 83.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:52 856204609 ns [4, S0.Tracker#0 *] (3240) offset: 83.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:52 920206539 ns [4, S0.Tracker#0 *] (3240) offset: 86.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:52 980206409 ns [4, S0.Tracker#0 *] (3240) offset: 88.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:53 044205759 ns [4, S0.Tracker#0 *] (3240) offset: 89.5 ns    delay: 172.5 ns  
+	ptp4l[1570.868]: master offset         91 s0 freq     +22 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:04:53 108209589 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.38 seconds.  
+	RE::SyncAnalysis: 2025-09-24 13:04:53 109106458 ns [3, Supervisor] (3109) Corrected: -26.563286 ppb from S0.Tracker#0    Total Aged: -26.563286 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:04:53 111109188 ns [3, Supervisor] (3214) Phase pull-in:  -92 ns. blocking 1.  
+	RE::SyncAnalysis: 2025-09-24 13:04:53 203294170 ns [3, Supervisor] (3121) Corrected: -0.000000092 s from S0.Tracker#0    Max FFO req/gnt: 1000.000000 / 1000.000000 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 232224741 ns [4, S0.Tracker#0 *] (3240) offset: 16.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 292225091 ns [4, S0.Tracker#0 *] (3240) offset: 17.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 356204971 ns [4, S0.Tracker#0 *] (3240) offset: 16.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 420204711 ns [4, S0.Tracker#0 *] (3240) offset: 16.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 480219961 ns [4, S0.Tracker#0 *] (3240) offset: 19.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 544206561 ns [4, S0.Tracker#0 *] (3240) offset: 21.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 608206001 ns [4, S0.Tracker#0 *] (3240) offset: 22.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 668206792 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.44 seconds.  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 668944289 ns [3, Supervisor] (3109) Corrected: -16.945653 ppb from S0.Tracker#0    Total Aged: -16.945653 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 670985279 ns [3, Supervisor] (3214) Phase pull-in:  -23 ns. blocking 1.  
+	RE::SyncAnalysis: 2025-09-24 13:04:54 694174201 ns [3, Supervisor] (3121) Corrected: -0.000000023 s from S0.Tracker#0    Max FFO req/gnt: 1000.000000 / 1000.000000 ppb.  
+	ptp4l[1572.869]: master offset         -9 s0 freq     -51 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:04:55 796223884 ns [4, S0.Tracker#0 *] (3240) offset: -20.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:55 856206883 ns [4, S0.Tracker#0 *] (3240) offset: -21.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:55 920203054 ns [4, S0.Tracker#0 *] (3240) offset: -21.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:55 984257354 ns [4, S0.Tracker#0 *] (3240) offset: -21.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:56 044206004 ns [4, S0.Tracker#0 *] (3240) offset: -23.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:56 108208634 ns [4, S0.Tracker#0 *] (3240) offset: -24.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:56 168201704 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.38 seconds.  
+	RE::SyncAnalysis: 2025-09-24 13:04:56 168266255 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Snapping' to 'Converging'     3160.  
+	ptp4l[1574.870]: master offset        -25 s0 freq      -8 path delay       170
+	RE::SyncAnalysis: 2025-09-24 13:04:57 108228736 ns [4, S0.Tracker#0 *] (3240) offset: -25.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:58 108234767 ns [4, S0.Tracker#0 *] (3240) offset: -42.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:04:58 420226778 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Converging' to 'Statistics Collecting'     3159.  
+	RE::SyncAnalysis: 2025-09-24 13:04:58 420626022 ns [3, Supervisor] (3066) LO state: 'Lock Acquisition' to 'Frequency Locked'    Event: 'LO frequency locked'.  
+	RE::SyncAnalysis: 2025-09-24 13:04:58 420743133 ns [3, Supervisor] (3066) LO state: 'Frequency Locked' to 'Time Locked'    Event: 'LO time locked'.  
+	ptp4l[1576.245]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
+	ptp4l[1576.870]: master offset        -38 s2 freq      -6 path delay       173
+	ptp4l[1578.871]: master offset        -22 s2 freq      +8 path delay       172
+	ptp4l[1580.872]: master offset        -30 s2 freq      -4 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:05:03 108240235 ns [4, S0.Tracker#0 *] (3240) offset: -30.5 ns    delay: 171.5 ns  
+	ptp4l[1582.873]: master offset        -33 s2 freq      -1 path delay       172
+	ptp4l[1584.874]: master offset        -36 s2 freq      -1 path delay       170
+	RE::SyncAnalysis: 2025-09-24 13:05:08 112244023 ns [4, S0.Tracker#0 *] (3240) offset: -30.0 ns    delay: 171.0 ns  
+	ptp4l[1586.874]: master offset        -41 s2 freq      -2 path delay       174
+	ptp4l[1588.875]: master offset        -44 s2 freq      -1 path delay       172
+	ptp4l[1590.876]: master offset        -33 s2 freq      +5 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:05:13 112235331 ns [4, S0.Tracker#0 *] (3240) offset: -33.5 ns    delay: 171.5 ns  
+	ptp4l[1592.877]: master offset        -32 s2 freq      +1 path delay       173
+	ptp4l[1594.877]: master offset        -35 s2 freq      -2 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:05:18 116241959 ns [4, S0.Tracker#0 *] (3240) offset: -36.5 ns    delay: 171.5 ns  
+	ptp4l[1596.878]: master offset        -44 s2 freq      -4 path delay       172
+	ptp4l[1598.879]: master offset        -19 s2 freq     +13 path delay       171
+	ptp4l[1600.880]: master offset        -25 s2 freq      -3 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:05:23 116233586 ns [4, S0.Tracker#0 *] (3240) offset: -25.5 ns    delay: 172.5 ns  
+	ptp4l[1602.880]: master offset        -38 s2 freq      -6 path delay       173
+	ptp4l[1604.881]: master offset        -33 s2 freq      +1 path delay       170
+	RE::SyncAnalysis: 2025-09-24 13:05:28 120239564 ns [4, S0.Tracker#0 *] (3240) offset: -37.0 ns    delay: 171.0 ns  
+	ptp4l[1606.882]: master offset        -37 s2 freq      -2 path delay       171
+	ptp4l[1608.883]: master offset        -38 s2 freq      +0 path delay       173
+	ptp4l[1610.884]: master offset        -27 s2 freq      +4 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:05:33 120237622 ns [4, S0.Tracker#0 *] (3240) offset: -27.5 ns    delay: 171.5 ns  
+	ptp4l[1612.884]: master offset        -33 s2 freq      -3 path delay       171
+	ptp4l[1614.885]: master offset        -35 s2 freq      -0 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:05:38 124244940 ns [4, S0.Tracker#0 *] (3240) offset: -40.0 ns    delay: 171.0 ns  
+	ptp4l[1616.886]: master offset        -32 s2 freq      +2 path delay       172
+	ptp4l[1618.887]: master offset        -26 s2 freq      +3 path delay       173
+	ptp4l[1620.887]: master offset        -21 s2 freq      +1 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:05:43 124256168 ns [4, S0.Tracker#0 *] (3240) offset: -21.0 ns    delay: 171.0 ns  
+	ptp4l[1622.888]: master offset        -28 s2 freq      -3 path delay       172
+	ptp4l[1624.889]: master offset        -32 s2 freq      -1 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:05:48 128242205 ns [4, S0.Tracker#0 *] (3240) offset: -36.0 ns    delay: 171.0 ns  
+	ptp4l[1626.890]: master offset        -40 s2 freq      -5 path delay       171
+	ptp4l[1628.890]: master offset        -27 s2 freq      +6 path delay       171
+	ptp4l[1630.891]: master offset        -19 s2 freq      +5 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:05:53 128243653 ns [4, S0.Tracker#0 *] (3240) offset: -19.0 ns    delay: 173.0 ns  
+	ptp4l[1632.892]: master offset        -15 s2 freq      +1 path delay       173
+	ptp4l[1634.893]: master offset        -17 s2 freq      -1 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:05:58 132246201 ns [4, S0.Tracker#0 *] (3240) offset: -22.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:05:58 508212201 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Statistics Collecting' to 'Tracking'     3163.  
+	ptp4l[1636.893]: master offset        -21 s2 freq      -2 path delay       171
+	ptp4l[1638.894]: master offset        -32 s2 freq      -4 path delay       173
+	ptp4l[1640.895]: master offset        -14 s2 freq      +8 path delay       171
+	ptp4l[1642.896]: master offset        -11 s2 freq      +1 path delay       171
+	ptp4l[1644.896]: master offset        -11 s2 freq      +0 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:06:08 136247197 ns [4, S0.Tracker#0 *] (3240) offset: -16.0 ns    delay: 172.0 ns  
+	ptp4l[1646.897]: master offset        -23 s2 freq      -5 path delay       173
+	ptp4l[1648.898]: master offset        -21 s2 freq      +0 path delay       171
+	ptp4l[1650.899]: master offset         -8 s2 freq      +6 path delay       171
+	ptp4l[1652.899]: master offset         -7 s2 freq      +1 path delay       173
+	ptp4l[1654.900]: master offset        -23 s2 freq      -8 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:06:18 140245992 ns [4, S0.Tracker#0 *] (3240) offset: -16.5 ns    delay: 172.5 ns  
+	ptp4l[1656.901]: master offset        -27 s2 freq      -3 path delay       171
+	ptp4l[1658.902]: master offset        -35 s2 freq      -3 path delay       172
+	ptp4l[1660.902]: master offset        -22 s2 freq      +6 path delay       172
+	ptp4l[1662.903]: master offset        -16 s2 freq      +3 path delay       173
+	ptp4l[1664.904]: master offset        -10 s2 freq      +3 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:06:28 144248708 ns [4, S0.Tracker#0 *] (3240) offset: -14.0 ns    delay: 171.0 ns  
+	ptp4l[1666.905]: master offset        -24 s2 freq      -8 path delay       171
+	ptp4l[1668.906]: master offset        -35 s2 freq      -4 path delay       172
+	ptp4l[1670.906]: master offset        -22 s2 freq      +6 path delay       172
+	ptp4l[1672.907]: master offset         -6 s2 freq      +8 path delay       174
+	ptp4l[1674.908]: master offset        -18 s2 freq      -7 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:06:38 148248813 ns [4, S0.Tracker#0 *] (3240) offset: -19.5 ns    delay: 172.5 ns  
+	ptp4l[1676.909]: master offset        -22 s2 freq      -1 path delay       172
+	ptp4l[1678.909]: master offset        -25 s2 freq      -2 path delay       172
+	ptp4l[1680.910]: master offset        -18 s2 freq      +3 path delay       171
+	ptp4l[1682.911]: master offset        -16 s2 freq      +2 path delay       173
+	ptp4l[1684.912]: master offset        -16 s2 freq      +0 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:06:48 148248519 ns [4, S0.Tracker#0 *] (3240) offset: -19.0 ns    delay: 173.0 ns  
+	ptp4l[1686.912]: master offset        -23 s2 freq      -3 path delay       172
+	ptp4l[1688.913]: master offset        -27 s2 freq      -3 path delay       173
+	ptp4l[1690.914]: master offset        -26 s2 freq      +1 path delay       173
+	ptp4l[1692.915]: master offset        -14 s2 freq      +5 path delay       171
+	ptp4l[1694.915]: master offset        -19 s2 freq      -1 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:06:58 152245045 ns [4, S0.Tracker#0 *] (3240) offset: -10.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:06:58 528229885 ns [4, S0.Tracker#0 *] (3203) 	numberOfCorrection: 1957, mean: -21.6 ns, std: 8.4 ns.  
+	ptp4l[1696.916]: master offset         -7 s2 freq      +6 path delay       173
+	ptp4l[1698.917]: master offset        -13 s2 freq      -5 path delay       171
+	ptp4l[1700.918]: master offset        -21 s2 freq      -3 path delay       171
+	ptp4l[1702.918]: master offset        -17 s2 freq      +2 path delay       171
+	ptp4l[1704.919]: master offset        -15 s2 freq      +1 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:07:08 156237480 ns [4, S0.Tracker#0 *] (3240) offset: -14.5 ns    delay: 171.5 ns  
+	ptp4l[1706.920]: master offset        -19 s2 freq      -1 path delay       171
+	ptp4l[1708.921]: master offset        -11 s2 freq      +3 path delay       171
+	ptp4l[1710.922]: master offset         -6 s2 freq      +3 path delay       171
+	ptp4l[1712.922]: master offset        -19 s2 freq      -6 path delay       173
+	ptp4l[1714.923]: master offset        -16 s2 freq      +1 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:07:18 160244286 ns [4, S0.Tracker#0 *] (3240) offset: -16.0 ns    delay: 173.0 ns  
+	ptp4l[1716.924]: master offset        -16 s2 freq      +0 path delay       172
+	ptp4l[1718.925]: master offset         -1 s2 freq      +6 path delay       170
+	ptp4l[1720.925]: master offset        -19 s2 freq      -8 path delay       172
+	ptp4l[1722.926]: master offset         -8 s2 freq      +4 path delay       171
+	ptp4l[1724.927]: master offset        -19 s2 freq      -5 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:07:28 164247481 ns [4, S0.Tracker#0 *] (3240) offset: -28.5 ns    delay: 172.5 ns  
+	ptp4l[1726.928]: master offset        -30 s2 freq      -6 path delay       170
+	ptp4l[1728.928]: master offset        -14 s2 freq      +8 path delay       170
+	ptp4l[1730.929]: master offset         -6 s2 freq      +5 path delay       173
+	ptp4l[1732.930]: master offset        -14 s2 freq      -5 path delay       170
+	ptp4l[1734.931]: master offset          2 s2 freq      +8 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:07:38 168250897 ns [4, S0.Tracker#0 *] (3240) offset: -3.5 ns    delay: 172.5 ns  
+	ptp4l[1736.931]: master offset          0 s2 freq      +0 path delay       173
+	ptp4l[1738.932]: master offset        -10 s2 freq      -5 path delay       173
+	ptp4l[1740.933]: master offset        -21 s2 freq      -6 path delay       171
+	ptp4l[1742.934]: master offset        -29 s2 freq      -3 path delay       173
+	ptp4l[1744.934]: master offset        -14 s2 freq      +6 path delay       170
+	RE::SyncAnalysis: 2025-09-24 13:07:48 172245113 ns [4, S0.Tracker#0 *] (3240) offset: 0.0 ns    delay: 173.0 ns  
+	ptp4l[1746.935]: master offset         -1 s2 freq      +6 path delay       170
+	ptp4l[1748.936]: master offset        -14 s2 freq      -6 path delay       171
+	ptp4l[1750.937]: master offset        -19 s2 freq      -2 path delay       172
+	ptp4l[1752.938]: master offset         -3 s2 freq      +8 path delay       172
+	ptp4l[1754.938]: master offset         -9 s2 freq      -3 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:07:58 176247178 ns [4, S0.Tracker#0 *] (3240) offset: -8.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:07:58 552228189 ns [4, S0.Tracker#0 *] (3203) 	numberOfCorrection: 2917, mean: -13.7 ns, std: 8.3 ns.  
+	ptp4l[1756.939]: master offset        -11 s2 freq      -1 path delay       171
+	ptp4l[1758.940]: master offset          2 s2 freq      +6 path delay       171
+	ptp4l[1760.941]: master offset         -9 s2 freq      -5 path delay       172
+	ptp4l[1762.941]: master offset        -19 s2 freq      -4 path delay       172
+	ptp4l[1764.942]: master offset         -6 s2 freq      +6 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:08:08 180244804 ns [4, S0.Tracker#0 *] (3240) offset: -6.0 ns    delay: 173.0 ns  
+	ptp4l[1766.943]: master offset        -13 s2 freq      -3 path delay       173
+	ptp4l[1768.944]: master offset         -4 s2 freq      +3 path delay       171
+	ptp4l[1770.944]: master offset        -10 s2 freq      -2 path delay       171
+	ptp4l[1772.945]: master offset         -8 s2 freq      +0 path delay       172
+	ptp4l[1774.946]: master offset         -2 s2 freq      +3 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:08:18 184245699 ns [4, S0.Tracker#0 *] (3240) offset: -8.0 ns    delay: 171.0 ns  
+	ptp4l[1776.947]: master offset         -3 s2 freq      +0 path delay       171
+	ptp4l[1778.947]: master offset         -3 s2 freq      -0 path delay       173
 </details>
 
 >* **Note:** *`LO state: 'Frequency Locked' to 'Time Locked'    Event: 'LO time locked'`* in pcm4l log indicates both the frequency and phase of the local oscillator are aligned with the reference clock.
+
 #### Unicast Mode:
 
 **Master:**
+* Run ts2phc between Renesas ClockMatrix PHC and AMD Timer-Syncer PHC in background:
+
+``` 
+Board-1 > ts2phc -mqf /usr/bin/zcu670_ts2phc.cfg &
+``` 
 
 * Run ptp4l using G.8275.2 configuration on master board:
 
 ``` 
-Board -1 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/unicast_master.cfg
+Board -1 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/zcu670_unicast_master.cfg
  ``` 
 **ptp4l master side log**:
 ``` 
-xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/unicast_master.cfg
+xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/zcu670_unicast_master.cfg
 option slaveOnly is deprecated, please use clientOnly instead
 option masterOnly is deprecated, please use serverOnly instead
-ptp4l[148637.291]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[148637.292]: selected /dev/ptp1 as PTP clock
-ptp4l[148637.293]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[148637.293]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[148637.293]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[148643.256]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
-ptp4l[148643.256]: selected local clock e293dd.fffe.d944a5 as best master
-ptp4l[148643.256]: port 1 (eth1): assuming the grand master role
+ptp4l[163.349]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[163.349]: selected /dev/ptp1 as PTP clock
+ptp4l[163.351]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[163.351]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[163.352]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[168.197]: port 1 (eth1): LISTENING to MASTER on ANNOUNCE_RECEIPT_TIMEOUT_EXPIRES
+ptp4l[168.198]: selected local clock d67918.fffe.344d1e as best master
+ptp4l[168.198]: port 1 (eth1): assuming the grand master role
 ``` 
 **Slave:**
 
-> * **Note:** Before running ptp4l on slave board, add IP address of master interface to the unicast_master_table given in `/usr/local/etc/ptp4l/externServo_unicast_2port_sc.cfg` config file.
-
 * Run ptp4l enabling external servo on slave board:
 ```
-Board -2 > ptp4l -i <interface-name> -m -f /usr/local/etc/ptp4l/externServo_unicast_2port_sc.cfg &
+Board -2 > ptp4l -mqf /usr/local/etc/ptp4l/zcu670_externServo_unicast_1port.cfg -p /dev/ptp0 &
 ```
+> * **Note:**  Before running ptp4l on the slave board, add the master’s UDPv4 IP to unicast_master_table in the `zcu670_externServo_unicast_1port.cfg` config file. Also, update the default interface eth1 if using a different one.
 
 **ptp4l slave side log**:
-   ```
-xilinx-zcu670-20241:/home/petalinux# ptp4l -i eth1 -m -f /usr/local/etc/ptp4l/externServo_unicast_2port_sc.cfg &
+```
+xilinx-zcu670-20241:/home/petalinux# ptp4l -mqf /usr/local/etc/ptp4l/zcu670_externServo_unicast_1port.cfg -p /dev/ptp0 &
+[1] 657
 option slaveOnly is deprecated, please use clientOnly instead
 xilinx-zcu670-20241:/home/petalinux# option masterOnly is deprecated, please use serverOnly instead
-ptp4l[63478.948]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[63478.948]: ioctl SIOCETHTOOL failed: Operation not supported
-ptp4l[63478.950]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[63478.950]: port 2 (eth2): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[63478.950]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[63478.951]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
-ptp4l[63482.960]: port 1 (eth1): new foreign master e293dd.fffe.d944a5-1
-ptp4l[63484.022]: selected local clock 1af508.fffe.6c0571 as best master
-ptp4l[63486.960]: selected best master clock e293dd.fffe.d944a5
-ptp4l[63486.960]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
-ptp4l[63492.960]: master offset   -7307614 s0 freq   -1577 path delay       101
-ptp4l[63494.960]: master offset   -7310756 s0 freq   -1574 path delay        95
-ptp4l[63496.960]: master offset   -7313965 s0 freq   -1571 path delay       115
-   ```  
+ptp4l[206.572]: ioctl SIOCETHTOOL failed: Operation not supported
+ptp4l[206.573]: port 1 (eth1): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[206.574]: port 0 (/var/run/ptp4l): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[206.574]: port 0 (/var/run/ptp4lro): INITIALIZING to LISTENING on INIT_COMPLETE
+ptp4l[208.157]: port 1 (eth1): new foreign master d67918.fffe.344d1e-1
+ptp4l[212.157]: selected best master clock d67918.fffe.344d1e
+ptp4l[212.157]: port 1 (eth1): LISTENING to UNCALIBRATED on RS_SLAVE
+ptp4l[214.201]: master offset 1758720559867632709 s0 freq     +12 path delay       171
+ptp4l[216.202]: master offset 1758720559867632749 s0 freq     +20 path delay       171
+ptp4l[218.203]: master offset 1758720559867632787 s0 freq     +19 path delay       171
+ptp4l[220.204]: master offset 1758720559867632834 s0 freq     +22 path delay       171
+ptp4l[222.204]: master offset 1758720559867632870 s0 freq     +19 path delay       173
+ptp4l[224.205]: master offset 1758720559867632908 s0 freq     +18 path delay       171
+ptp4l[226.206]: master offset 1758720559867632941 s0 freq     +17 path delay       173
+ptp4l[228.207]: master offset 1758720559867632992 s0 freq     +25 path delay       171
+ptp4l[230.207]: master offset 1758720559867633050 s0 freq     +28 path delay       171
+ptp4l[232.208]: master offset 1758720559867633098 s0 freq     +24 path delay       171
+
+```  
 > * **Note:** PTP clock servo state remains in unlocked state (s0), expecting pcm4l to control the servo.
 
 * Run pcm4l:
 ```
-Board -2 > pcm4l -f /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json
+Board -2 > pcm4l -f /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json
 ```
 
 **pcm4l log**:
@@ -1778,302 +1925,398 @@ The pcm4l log is given below.
 
 <details>
 <summary>Click to expand </summary>
-   
-    xilinx-zcu670-20241:/home/petalinux# pcm4l -f /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json The file is /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json JSON file: /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json Start Logger
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200153759 ns [0, Main] (3561) RE PTP Software Release ID = 4.3.1.390841, Commit ID = 3299c31d457548b46ebd2a40127622a953f5088c Aug 16 2024 19:54:09
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200218320 ns [0, Main] (3561) Configuration file: /usr/local/etc/pcm4l/reConfigPCM_G8273_2.json
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200242920 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200263630 ns [0, Main] (3561) “versionId”: “4.3”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200284601 ns [0, Main] (3561) “testModeEnable”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200305391 ns [0, Main] (3561) “referenceTrackerType”: “WritePhase”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200327291 ns [0, Main] (3561) “remoteUdsAddress”: “/var/run/ptp4l”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200349081 ns [0, Main] (3561) “localUdsAddress”: “/var/run/pcm4l”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200370322 ns [0, Main] (3561) “mngApiTimeoutMilliseconds”: 100,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200391572 ns [0, Main] (3561) “stepWindowSeconds”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200413252 ns [0, Main] (3561) “phc4lConfig”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200433902 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200453802 ns [0, Main] (3561) “dcoDevice”: “/dev/ptp0”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200474773 ns [0, Main] (3561) “tsDevice”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200504913 ns [0, Main] (3561) [
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200526283 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200547003 ns [0, Main] (3561) “tsDeviceName”: “/dev/ptp1”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200568544 ns [0, Main] (3561) “tsDevicePinIndex”: -1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200592544 ns [0, Main] (3561) “tsDeviceExttsChannel”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200614454 ns [0, Main] (3561) “tsDeviceExttsCorrectionNs”: 0
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200636134 ns [0, Main] (3561) }
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200656644 ns [0, Main] (3561) ],
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200677285 ns [0, Main] (3561) “charDevice”: “/dev/rsmu0”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200698185 ns [0, Main] (3561) “phaseSnapDelaySeconds”: 3,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200719325 ns [0, Main] (3561) “tsCalibrationEnable”: 0
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200740175 ns [0, Main] (3561) },
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200761315 ns [0, Main] (3561)
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200781416 ns [0, Main] (3561) “deviceConfig”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200801896 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200821786 ns [0, Main] (3561) “oscillatorType”: “Tcxo”,
-     
-    Starting RE PTP with external Linux stack… RE PTP Software Release ID = 4.3.1.390841, Commit ID = 3299c31d457548b46ebd2a40127622a953f5088c RE::SyncAnalysis: 2024-09-19 11:45:20 200842856 ns [0, Main] (3561) “dpll1588Instance”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200900957 ns [0, Main] (3561) “tsDeviceAlignmentDisable”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200923447 ns [0, Main] (3561) “holdover”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200944927 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200967817 ns [0, Main] (3561) “holdoverType”: “HardwareEnhanced”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 200989798 ns [0, Main] (3561) “holdoverLossPhysicalOosEnable”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 201011528 ns [0, Main] (3561) “holdoverTimeoutSeconds”: 1000,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 201034568 ns [0, Main] (3561) “holdoverQualificationSeconds”: 100,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 201056158 ns [0, Main] (3561) “unqualifiedTimeoutSeconds”: 10000,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 201077549 ns [0, Main] (3561) “outOfSpecUserDefinedFrequencyOffsetEnable”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534393472 ns [0, Main] (3561) “outOfSpecUserDefinedFrequencyOffsetPpb”: 0
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534426433 ns [0, Main] (3561) }
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534448053 ns [0, Main] (3561) },
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534468193 ns [0, Main] (3561) “profileConfig”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534488963 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534509783 ns [0, Main] (3561) “physicalPllClockCategory”: 4,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534530964 ns [0, Main] (3561) “physicalPllClockCategoryThreshold”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534552544 ns [0, Main] (3561) “physicalPllInstance”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534573304 ns [0, Main] (3561) “physicalPllWaitToRestoreTimeoutValue”: 10
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534595384 ns [0, Main] (3561) },
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534615404 ns [0, Main] (3561)
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534635545 ns [0, Main] (3561) “loggerConfig”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534656325 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534676315 ns [0, Main] (3561) “stdoutLog”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534697145 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534717106 ns [0, Main] (3561) “enable”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534737976 ns [0, Main] (3561) “selectionMask”: “0000000000011111”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534759436 ns [0, Main] (3561) “description”: “ | ||||||___ 0: Sync error “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534783146 ns [0, Main] (3561) “description”: “ | |||||____ 1: Sync warning “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534805996 ns [0, Main] (3561) “description”: “ | ||||_____ 2: Sync analysis “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534829567 ns [0, Main] (3561) “description”: “ | |||______ 3: Error “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534852257 ns [0, Main] (3561) “description”: “ | ||_______ 4: Warning “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534875527 ns [0, Main] (3561) “description”: “ | |________ 5: Debug “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534899007 ns [0, Main] (3561) “description”: “ |__________ 7: Timestamp “
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534922098 ns [0, Main] (3561) },
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534942838 ns [0, Main] (3561)
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534962898 ns [0, Main] (3561) “externalFdLog”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 534983388 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 535003568 ns [0, Main] (3561) “enable”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 535024429 ns [0, Main] (3561) “selectionMask”: “0000000000011111”,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 535047139 ns [0, Main] (3561) “description”: “ | ||||||___ 0: Sync error “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 535070229 ns [0, Main] (3561) “description”: “ | |||||____ 1: Sync warning “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 535092759 ns [0, Main] (3561) “description”: “ | ||||_____ 2: Sync analysis “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 535115319 ns [0, Main] (3561) “description”: “ | |||______ 3: Error “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 535138740 ns [0, Main] (3561) “description”: “ | ||_______ 4: Warning “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868482944 ns [0, Main] (3561) “description”: “ | |________ 5: Debug “,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868509054 ns [0, Main] (3561) “description”: “ |__________ 7: Timestamp “
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868533114 ns [0, Main] (3561) }
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868554324 ns [0, Main] (3561) },
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868574275 ns [0, Main] (3561)
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868594315 ns [0, Main] (3561) “instanceConfig”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868615935 ns [0, Main] (3561) [
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868636135 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868655995 ns [0, Main] (3561) “correctionFieldEnable”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868677576 ns [0, Main] (3561) “lostMasterTimeoutMilliseconds”: 2000,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868699876 ns [0, Main] (3561) “manageClockClassEnable”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868720976 ns [0, Main] (3561) “manageClockClassExtendedEnable”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868742786 ns [0, Main] (3561) “ptpDomainNumber”: -1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868763827 ns [0, Main] (3561) “numberOfTrackerInstances”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868785807 ns [0, Main] (3561)
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868805887 ns [0, Main] (3561) “trackerConfig”:
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868826577 ns [0, Main] (3561) {
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868847117 ns [0, Main] (3561) “delayAsymmetryNanoseconds”: 0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868869168 ns [0, Main] (3561) “phaseSnapThresholdSeconds”: 0.00001,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868890748 ns [0, Main] (3561) “floorDelayEstimateSeconds”: -1.0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868912058 ns [0, Main] (3561) “timeLockThresholdNanoseconds”: 100,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868933658 ns [0, Main] (3561) “willCorrectFrequencyAtFirstSnap”: 1,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868955948 ns [0, Main] (3561) “frequencyLockThresholdPpb”: 16.0,
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868977499 ns [0, Main] (3561) “lockFilterWindowLengthSeconds”: 1.0
-    RE::SyncAnalysis: 2024-09-19 11:45:20 868999099 ns [0, Main] (3561) }
-    RE::SyncAnalysis: 2024-09-19 11:45:20 869019199 ns [0, Main] (3561) }
-    RE::SyncAnalysis: 2024-09-19 11:45:20 869039479 ns [0, Main] (3561) ]
-    RE::SyncAnalysis: 2024-09-19 11:45:20 869059319 ns [0, Main] (3561) }
-    RE::Warning: 2024-09-19 11:45:20 869079040 ns [0, Main] (5060) ** Alert - the following values are non default:
-    RE::Warning: 2024-09-19 11:45:20 869100770 ns [0, Main] (5060) ** referenceTrackerType = 2 **
-    RE::Warning: 2024-09-19 11:45:20 869121410 ns [0, Main] (5060) ** phc4lConfig.dcoDevice = /dev/ptp0 **
-    RE::Warning: 2024-09-19 11:45:20 869142930 ns [0, Main] (5060) ** phc4lConfig.phaseSnapDelaySeconds = 3 **
-    RE::Warning: 2024-09-19 11:45:20 869164241 ns [0, Main] (5060) ** deviceConfig.oscillatorType = 0 **
-    RE::Warning: 2024-09-19 11:45:20 869185271 ns [0, Main] (5060) ** deviceConfig.dpll1588Instance = 1 **
-    RE::Warning: 2024-09-19 11:45:20 869206171 ns [0, Main] (5060) ** phc4lConfig.tsDevice[0] = /dev/ptp1 **
-    RE::Warning: 2024-09-19 11:45:20 869227771 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverType = 2 **
-    RE::Warning: 2024-09-19 11:45:21 202577045 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverTimeoutSeconds = 1000 **
-    RE::Warning: 2024-09-19 11:45:21 202602525 ns [0, Main] (5060) ** profileConfig.physicalPllClockCategory = 4 **
-    RE::Warning: 2024-09-19 11:45:21 202625446 ns [0, Main] (5060) ** profileConfig.physicalPllInstance = 0 **
-    RE::Warning: 2024-09-19 11:45:21 202647106 ns [0, Main] (5060) ** The following non default reference tracker parameters are for stack instance 0 (each reference tracker configuration is identical) **
-    RE::Warning: 2024-09-19 11:45:21 202672496 ns [0, Main] (5060) ** instanceConfig.trackerConfig.willCorrectFrequencyAtFirstSnap = 1 **
-    RE::Warning: 2024-09-19 11:45:21 202695376 ns [0, Main] (5060) ** instanceConfig.trackerConfig.frequencyLockThresholdPpb = 16.000000 **
-    RE::Warning: 2024-09-19 11:45:21 202718697 ns [0, Main] (5060) ** instanceConfig.trackerConfig.timeLockThresholdNanoseconds = 100.000000 **
-    RE::SyncAnalysis: 2024-09-19 11:45:21 202763617 ns [0, Main] (3102) Configuring IDT Phc4l timestamper (/dev/ptp1).
-     
-    RE::SyncAnalysis: 2024-09-19 11:45:21 202800327 ns [0, Main] (3222) Instance 0: stack adaptor state transition –> Start.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 202821988 ns [0, Main] (3579) QR: Qualified reference is not supported (PTP monitoring configuration is not valid and reference tracker type configuration is not valid)
-    RE::SyncAnalysis: 2024-09-19 11:45:21 202846828 ns [0, Main] (3004) RE PTP Software Release ID: 4.3.1.390841 & Commit ID: 3299c31d457548b46ebd2a40127622a953f5088c.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 202891638 ns [3, Supervisor] (3101) Configuring Phc4l device driver (/dev/ptp0).
-    RE::SyncAnalysis: 2024-09-19 11:45:21 202913149 ns [3, Supervisor] (3236) phc4l initialization: set initial FFO value to -38 ppb.
-    ptp4l[63508.960]: master offset -7330881 s0 freq -585 path delay 77
-    RE::SyncAnalysis: 2024-09-19 11:45:21 808667767 ns [3, Supervisor] (3220) HW device configuration complete.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 808726788 ns [3, Supervisor] (3153) Clock category changed: E_CATEGORY_INVALID (6) -> E_CATEGORY4 (4).
-    RE::SyncAnalysis: 2024-09-19 11:45:21 809120712 ns [3, Supervisor] (3562) Set combo mode Hold/Freeze
-    RE::SyncAnalysis: 2024-09-19 11:45:21 810035471 ns [3, Supervisor] (3521) Sync-e Supervisor state: Unqualified
-    RE::SyncAnalysis: 2024-09-19 11:45:21 810064171 ns [3, Supervisor] (3520) Sync-e Supervisor is started.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 810116711 ns [3, Supervisor] (3066) LO state: ‘Initial’ to ‘Free Run’ Event: ‘LO initialized’.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 810641387 ns [4, S0.Tracker#0] (3252) Tracker run mode: ‘Snapping’ 3165.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 810681037 ns [3, Supervisor] (3225) Register tracker S0.Tracker#0: stack instance number 0; reference tracker instance number 0
-    RE::SyncAnalysis: 2024-09-19 11:45:21 810820179 ns [5, MngIf] (3049) Listening on IP Address 127.0.0.1 on port 2400.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 812463455 ns [0, Main] (3222) Instance 0: stack adaptor state transition –> RequestDefaultDataSet.
-    Stack instance 0 Default data set received: twoStep: 1 clockId: 1a:f5:08:ff:fe:6c:05:71 ports: 2 clkClass: 255 clkAccur: 254 clkScldVar: 65535 prio1: 128 prio2: 255 domain: 44 slaveOnly: 1
-    RE::SyncAnalysis: 2024-09-19 11:45:21 924573766 ns [0, Main] (3279) CCM: disabled (Initial clockClass: 255, JSON: manageClockClassEnable 1, manageClockClassExtendedEnable 0)
-    RE::SyncAnalysis: 2024-09-19 11:45:21 928354044 ns [0, Main] (3222) Instance 0: stack adaptor state transition –> RequestParentDataSet.
-    Stack instance 0 Parent data set received: parentPortId: e2:93:dd:ff:fe:d9:44:a5.1 parentStats: 0 oposlv: 65535 opcpcr: 2147483647 gmPriority1: 128 gmPriority2: 128 clkClass: 248 clkAccur: 254 clkScldVar: 65535 gmClockId: e2:93:dd:ff:fe:d9:44:a5
-    RE::SyncAnalysis: 2024-09-19 11:45:21 940353304 ns [0, Main] (3222) Instance 0: stack adaptor state transition –> RequestTimePropertiesDataSet.
-    Stack instance 0 Time Properties data set received: curUtcOffs: 37 tmSrc: 160 leap_61: 0 leap_59: 0 curUtcOffsVal: 0 ptpTmScale: 1 timeTraceable: 0 freqTraceable: 0
-    RE::SyncAnalysis: 2024-09-19 11:45:21 952342524 ns [0, Main] (3222) Instance 0: stack adaptor state transition –> RequestClockDescription.
-    Stack instance 0 Clock Description 0 received: clockType: BC phyLayerProtocol: IEEE 802.3 phyAddress: 1A: F5: 08: 6C: 05: 71: protocolAddress: IPv4: 192.168.1.100 manufacturer id: 000000 productDescription: ;; revision: ;; userDescription:profile id: 0019a7020102
-    Stack instance 0 Clock Description 1 received: clockType: BC phyLayerProtocol: IEEE 802.3 phyAddress: 02: CA: 1D: C3: B8: 7C: protocolAddress: IPv4: 193.168.1.100 manufacturer id: 000000 productDescription: ;; revision: ;; userDescription: profile id: 0019a7020102
-    RE::SyncAnalysis: 2024-09-19 11:45:21 64371084 ns [0, Main] (3222) Instance 0: stack adaptor state transition –> RequestPortDataSet.
-    Stack instance 0 Port data set 0 received: port identity: 1a:f5:08:ff:fe:6c:05:71.1 port state: UNCALIBRATED logMinDelReqIntv: -4 p2pMeanPathDel: 0 logAnnounceIntv: 1 announceReceiptTmout: 2 logSyncIntv: -4 delay mechanism: 1 logMinPDelReqIntv: 0 versionNumber: 2
-    Stack instance 0 Port data set 1 received: port identity: 1a:f5:08:ff:fe:6c:05:71.2 port state: LISTENING logMinDelReqIntv: -4 p2pMeanPathDel: 0 logAnnounceIntv: 1 announceReceiptTmout: 2 logSyncIntv: -4 delay mechanism: 1 logMinPDelReqIntv: 0 versionNumber: 2
-    RE::SyncAnalysis: 2024-09-19 11:45:21 976672957 ns [0, Main] (3221) Timestamper device eth1 is used by external Linux stack
-    RE::SyncAnalysis: 2024-09-19 11:45:21 976721098 ns [0, Main] (3221) Timestamper device eth2 is used by external Linux stack
-    RE::SyncAnalysis: 2024-09-19 11:45:21 976744048 ns [0, Main] (3222) Instance 0: stack adaptor state transition –> Running.
-    RE::SyncAnalysis: 2024-09-19 11:45:21 980373444 ns [3, Supervisor] (3280) Notified frequency traceability for stack instance 0: 0
-    RE::SyncAnalysis: 2024-09-19 11:45:22 028366334 ns [0, Main] (3283) Inserted master information list node: actual e2:93:dd:ff:fe:d9:44:a5.1; local stack 1a:f5:08:ff:fe:6c:05:71.0
-    RE::SyncAnalysis: 2024-09-19 11:45:22 028413105 ns [0, Main] (3268) Instance 0: e2:93:dd:ff:fe:d9:44:a5.1 state transition –> WaitTimestamps
-    RE::SyncAnalysis: 2024-09-19 11:45:22 810274085 ns [0, Main] (3524) Sync-e Supervisor: physical clock category changed to 4
-    RE::SyncAnalysis: 2024-09-19 11:45:22 810347685 ns [0, Main] (3525) Sync-e Supervisor: physical clock category threshold changed to 1
-    RE::SyncWarning: 2024-09-19 11:45:22 810373166 ns [0, Main] (2190) Sync-e Supervisor: physical clock category (4) does not meet the threshold (1)
-    ptp4l[63510.960]: master offset -7330891 s0 freq -6 path delay 76 ptp4l[63512.960]: master offset -7330909 s0 freq -8 path delay 77 RE::SyncAnalysis: 2024-09-19 11:45:26 156383351 ns [0, Main] (3268) Instance 0: e2:93:dd:ff:fe:d9:44:a5.1 state transition –> UpdateMasterInfo
-    RE::SyncError: 2024-09-19 11:45:26 160351411 ns [0, Main] (1128) Stack instance 0, master e2:93:dd:ff:fe:d9:44:a5.1 is not in uncalibrated or slave state
-    RE::SyncAnalysis: 2024-09-19 11:45:26 160401021 ns [0, Main] (3275) Single path active: 0.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 160423461 ns [0, Main] (3223) Measured sync interval is 62500 us for master e2:93:dd:ff:fe:d9:44:a5.1
-    RE::SyncAnalysis: 2024-09-19 11:45:26 160446402 ns [0, Main] (3224) Measured delay request interval is 62500 us for master e2:93:dd:ff:fe:d9:44:a5.1
-    RE::SyncAnalysis: 2024-09-19 11:45:26 160469532 ns [0, Main] (3268) Instance 0: e2:93:dd:ff:fe:d9:44:a5.1 state transition –> Running
-    RE::SyncAnalysis: 2024-09-19 11:45:26 168429041 ns [3, Supervisor] (3258) Stack instance 0: Attempt to register new master e2:93:dd:ff:fe:d9:44:a5.1 with best master e2:93:dd:ff:fe:d9:44:a5.1
-    RE::SyncAnalysis: 2024-09-19 11:45:26 168479952 ns [3, Supervisor] (3260) Stack instance 0, tracker instance 0: Allocated new tracker S0.Tracker#0.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 168503112 ns [3, Supervisor] (3125) Assign tracker S0.Tracker#0 to track e2:93:dd:ff:fe:d9:44:a5.1
-    RE::SyncAnalysis: 2024-09-19 11:45:26 168525912 ns [3, Supervisor] (3123) 1588 reference acquired, S0.Tracker#0 is the chosen tracker (e2:93:dd:ff:fe:d9:44:a5.1)
-    RE::SyncAnalysis: 2024-09-19 11:45:26 168549203 ns [3, Supervisor] (3066) LO state: ‘Free Run’ to ‘Lock Acquisition’ Event: ‘LO reference acquired’.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 168666534 ns [4, S0.Tracker#0] (3276) processSinglePathInfo: Single path active = 0.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 168697804 ns [4, S0.Tracker#0 *] (3252) Tracker run mode: ‘Snapping’ 3164.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 188459952 ns [0, Main] (3285) Best master changed from 00:00:00:00:00:00:00:00.0 to e2:93:dd:ff:fe:d9:44:a5.1
-    RE::SyncAnalysis: 2024-09-19 11:45:26 188502832 ns [3, Supervisor] (3124) Best master is the same: e2:93:dd:ff:fe:d9:44:a5.1, chosen tracker: S0.Tracker#0.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 469226960 ns [3, Supervisor] (3109) Corrected: 0.000000 ppb from S0.Tracker#0 Total Aged/Raw: 0.000000 / 0.000000 ppb.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 471239980 ns [4, S0.Tracker#0 *] (3204) snapSubStage: ‘Initial’ to ‘Frequency Measurements’.
-    RE::SyncAnalysis: 2024-09-19 11:45:26 471276370 ns [4, S0.Tracker#0 *] (3240) offset: -7330913.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 528398222 ns [4, S0.Tracker#0 *] (3240) offset: -7330913.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 592383462 ns [4, S0.Tracker#0 *] (3240) offset: -7330913.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 652381532 ns [4, S0.Tracker#0 *] (3240) offset: -7330914.5 ns delay: 75.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 716386312 ns [4, S0.Tracker#0 *] (3240) offset: -7330915.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 780382872 ns [4, S0.Tracker#0 *] (3240) offset: -7330914.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 840387952 ns [4, S0.Tracker#0 *] (3240) offset: -7330915.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 904383932 ns [4, S0.Tracker#0 *] (3240) offset: -7330915.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:26 968385562 ns [4, S0.Tracker#0 *] (3240) offset: -7330916.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 028385322 ns [4, S0.Tracker#0 *] (3240) offset: -7330914.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 092384442 ns [4, S0.Tracker#0 *] (3240) offset: -7330915.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 152383692 ns [4, S0.Tracker#0 *] (3240) offset: -7330917.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 216384933 ns [4, S0.Tracker#0 *] (3240) offset: -7330918.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 280384173 ns [4, S0.Tracker#0 *] (3240) offset: -7330919.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 340386383 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 404389733 ns [4, S0.Tracker#0 *] (3240) offset: -7330920.5 ns delay: 76.5 ns
-    ptp4l[63514.960]: master offset -7330921 s0 freq -8 path delay 76 RE::SyncAnalysis: 2024-09-19 11:45:27 468387683 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.5 ns delay: 75.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 528383743 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 592384963 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 652383693 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 716399734 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 780384803 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 840387864 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 904386014 ns [4, S0.Tracker#0 *] (3240) offset: -7330922.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:27 968385034 ns [4, S0.Tracker#0 *] (3240) offset: -7330922.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 028383094 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 092384554 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 152383624 ns [4, S0.Tracker#0 *] (3240) offset: -7330925.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 216384744 ns [4, S0.Tracker#0 *] (3240) offset: -7330926.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 280384594 ns [4, S0.Tracker#0 *] (3240) offset: -7330927.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 340385714 ns [4, S0.Tracker#0 *] (3240) offset: -7330928.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 404385214 ns [4, S0.Tracker#0 *] (3240) offset: -7330929.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 468384615 ns [4, S0.Tracker#0 *] (3240) offset: -7330928.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 528383375 ns [4, S0.Tracker#0 *] (3240) offset: -7330928.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 592384445 ns [4, S0.Tracker#0 *] (3240) offset: -7330930.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 652383475 ns [4, S0.Tracker#0 *] (3240) offset: -7330930.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 716384825 ns [4, S0.Tracker#0 *] (3240) offset: -7330929.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 780383355 ns [4, S0.Tracker#0 *] (3240) offset: -7330929.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 840396445 ns [4, S0.Tracker#0 *] (3240) offset: -7330928.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 904387225 ns [4, S0.Tracker#0 *] (3240) offset: -7330927.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:28 968385015 ns [4, S0.Tracker#0 *] (3240) offset: -7330928.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 028384345 ns [4, S0.Tracker#0 *] (3240) offset: -7330926.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 092385456 ns [4, S0.Tracker#0 *] (3240) offset: -7330926.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 152383016 ns [4, S0.Tracker#0 *] (3240) offset: -7330925.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 216383956 ns [4, S0.Tracker#0 *] (3240) offset: -7330926.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 280382856 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 340385676 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 404384546 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.5 ns delay: 76.5 ns
-    ptp4l[63516.960]: master offset -7330923 s0 freq +0 path delay 76 RE::SyncAnalysis: 2024-09-19 11:45:29 468387416 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 528389016 ns [4, S0.Tracker#0 *] (3240) offset: -7330922.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 592387206 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 652384736 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.5 ns delay: 75.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 716385997 ns [4, S0.Tracker#0 *] (3240) offset: -7330922.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 780384177 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 840389937 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 904386247 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:29 968386387 ns [4, S0.Tracker#0 *] (3240) offset: -7330922.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 028384377 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 092386937 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 152385097 ns [4, S0.Tracker#0 *] (3240) offset: -7330922.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 216391627 ns [4, S0.Tracker#0 *] (3240) offset: -7330922.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 280386607 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 340384457 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 404386878 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 468389058 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 528384388 ns [4, S0.Tracker#0 *] (3240) offset: -7330920.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 592387158 ns [4, S0.Tracker#0 *] (3240) offset: -7330920.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 652382678 ns [4, S0.Tracker#0 *] (3240) offset: -7330920.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 716385348 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 780384928 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 840390628 ns [4, S0.Tracker#0 *] (3240) offset: -7330919.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 904394728 ns [4, S0.Tracker#0 *] (3240) offset: -7330921.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:30 968390139 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:31 028386499 ns [4, S0.Tracker#0 *] (3240) offset: -7330923.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:31 092385889 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.5 ns delay: 75.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:31 152388079 ns [4, S0.Tracker#0 *] (3240) offset: -7330926.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:31 216388359 ns [4, S0.Tracker#0 *] (3240) offset: -7330926.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:31 280387379 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:31 340386559 ns [4, S0.Tracker#0 *] (3240) offset: -7330924.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:31 404388229 ns [4, S0.Tracker#0 *] (3240) offset: -7330925.0 ns delay: 78.0 ns
-    ptp4l[63518.960]: master offset -7330923 s0 freq +0 path delay 76 RE::SyncAnalysis: 2024-09-19 11:45:31 468384639 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 4.94 seconds.
-    RE::SyncAnalysis: 2024-09-19 11:45:31 468484830 ns [3, Supervisor] (3213) Sync time of day: +0.007330924 s
-    ptp4l[63520.960]: master offset -11 s0 freq +3652090 path delay 77 RE::SyncAnalysis: 2024-09-19 11:45:34 878764078 ns [3, Supervisor] (3121) Corrected: +0.007330924 s from S0.Tracker#0 Max FFO req/gnt: -1.000000 / -1.000000 ppb.
-    ptp4l[63522.960]: master offset 46519 s0 freq +23264 path delay 76 RE::SyncAnalysis: 2024-09-19 11:45:35 968409086 ns [4, S0.Tracker#0 *] (3240) offset: 46516.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:36 028386466 ns [4, S0.Tracker#0 *] (3240) offset: 46515.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:36 092383076 ns [4, S0.Tracker#0 *] (3240) offset: 46516.5 ns delay: 77.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:36 152384687 ns [4, S0.Tracker#0 *] (3240) offset: 46515.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:36 216384007 ns [4, S0.Tracker#0 *] (3240) offset: 46516.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:36 280381727 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.31 seconds.
-    RE::SyncAnalysis: 2024-09-19 11:45:36 280452087 ns [3, Supervisor] (3213) Sync time of day: -0.000046516 s
-    ptp4l[63524.960]: master offset -46356 s0 freq -46439 path delay 77 ptp4l[63526.960]: master offset -46370 s0 freq -7 path delay 78 RE::SyncAnalysis: 2024-09-19 11:45:39 884042599 ns [3, Supervisor] (3121) Corrected: -0.000046516 s from S0.Tracker#0 Max FFO req/gnt: -1.000000 / -1.000000 ppb.
-    RE::SyncAnalysis: 2024-09-19 11:45:40 968412124 ns [4, S0.Tracker#0 *] (3240) offset: 125.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:41 028382644 ns [4, S0.Tracker#0 *] (3240) offset: 123.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:41 092386214 ns [4, S0.Tracker#0 *] (3240) offset: 124.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:41 152382094 ns [4, S0.Tracker#0 *] (3240) offset: 123.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:41 216382744 ns [4, S0.Tracker#0 *] (3240) offset: 120.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:41 280384885 ns [4, S0.Tracker#0 *] (3240) offset: 122.0 ns delay: 76.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:41 340388935 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.37 seconds.
-    RE::SyncAnalysis: 2024-09-19 11:45:41 340459435 ns [3, Supervisor] (3214) Phase pull-in: -120 ns. blocking 1.
-    RE::SyncAnalysis: 2024-09-19 11:45:41 460730698 ns [3, Supervisor] (3121) Corrected: -0.000000120 s from S0.Tracker#0 Max FFO req/gnt: 1000.000000 / 1000.000000 ppb.
-    ptp4l[63528.960]: master offset -1 s0 freq +23183 path delay 77 RE::SyncAnalysis: 2024-09-19 11:45:42 528403857 ns [4, S0.Tracker#0 *] (3240) offset: -8.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:42 592385237 ns [4, S0.Tracker#0 *] (3240) offset: -8.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:42 652381857 ns [4, S0.Tracker#0 *] (3240) offset: -8.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:42 716383157 ns [4, S0.Tracker#0 *] (3240) offset: -7.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:42 780381517 ns [4, S0.Tracker#0 *] (3240) offset: -9.0 ns delay: 78.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:42 840385917 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.31 seconds.
-    RE::SyncAnalysis: 2024-09-19 11:45:42 840452968 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: ‘Snapping’ to ‘Converging’ 3160.
-    ptp4l[63530.960]: master offset -16 s0 freq -8 path delay 76 RE::SyncAnalysis: 2024-09-19 11:45:43 780408609 ns [4, S0.Tracker#0 *] (3240) offset: -17.5 ns delay: 76.5 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:44 780418820 ns [4, S0.Tracker#0 *] (3240) offset: -20.0 ns delay: 77.0 ns
-    RE::SyncAnalysis: 2024-09-19 11:45:45 092404671 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: ‘Converging’ to ‘Statistics Collecting’ 3159.
-    RE::SyncAnalysis: 2024-09-19 11:45:45 092803265 ns [3, Supervisor] (3066) LO state: ‘Lock Acquisition’ to ‘Frequency Locked’ Event: ‘LO frequency locked’.
-    RE::SyncAnalysis: 2024-09-19 11:45:45 092898566 ns [3, Supervisor] (3066) LO state: ‘Frequency Locked’ to ‘Time Locked’ Event: ‘LO time locked’.
-    ptp4l[63532.648]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
-    ptp4l[63532.960]: master offset -20 s2 freq -2 path delay 78
-    ptp4l[63534.960]: master offset -14 s2 freq +3 path delay 78
-    ptp4l[63536.960]: master offset -20 s2 freq -3 path delay 76
-    RE::SyncAnalysis: 2024-09-19 11:45:49 780417478 ns [4, S0.Tracker#0 *] (3240) offset: -21.0 ns delay: 76.0 ns
-    ptp4l[63538.960]: master offset -9 s2 freq +6 path delay 77
-    ptp4l[63540.960]: master offset 0 s2 freq +5 path delay 75
+
+	xilinx-zcu670-20241:/home/petalinux# pcm4l -f /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json
+	The file is /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json
+	JSON file: /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json
+	Initialize default configuration values for linux Extern
+	Start Logger
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311055692 ns [0, Main] (3561) RE PTP Software Release ID = 4.3.4.518632, Commit ID = 07229d8c4548eebfbdb068ff4fef304398b817ba    Jul 31 2025  12:40:52  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311124812 ns [0, Main] (3561) Configuration file: /usr/local/etc/pcm4l/zcu670_reConfigPCM_G8273_2.json  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311150233 ns [0, Main] (3561) {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311170873 ns [0, Main] (3561)   "versionId": "4.3",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311191473 ns [0, Main] (3561)   "testModeEnable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311220983 ns [0, Main] (3561)   "referenceTrackerType": "WritePhase",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311246654 ns [0, Main] (3561)   "remoteUdsAddress": "/var/run/ptp4l",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311272624 ns [0, Main] (3561)   "localUdsAddress": "/var/run/pcm4l",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311295544 ns [0, Main] (3561)   "mngApiTimeoutMilliseconds": 100,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311317874 ns [0, Main] (3561)   "stepWindowSeconds": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311342965 ns [0, Main] (3561)   "phc4lConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311363785 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311383335 ns [0, Main] (3561)       "dcoDevice": "/dev/ptp0",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311403495 ns [0, Main] (3561)       "tsDevice":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311423905 ns [0, Main] (3561)       [  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311443486 ns [0, Main] (3561)           {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311464666 ns [0, Main] (3561)               "tsDeviceName": "/dev/ptp1",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311486176 ns [0, Main] (3561)               "tsDevicePinIndex": -1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311506716 ns [0, Main] (3561)               "tsDeviceExttsChannel": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311527957 ns [0, Main] (3561)               "tsDeviceExttsCorrectionNs": -434  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311548557 ns [0, Main] (3561)           }  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311568127 ns [0, Main] (3561)       ],  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311587387 ns [0, Main] (3561)       "charDevice": "/dev/rsmu0",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311608097 ns [0, Main] (3561)       "phaseSnapDelaySeconds": 3,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311628878 ns [0, Main] (3561)       "tsCalibrationEnable": 0  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311648938 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311668328 ns [0, Main] (3561)     
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311688738 ns [0, Main] (3561)   "deviceConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311708398 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311727409 ns [0, Main] (3561)       "oscillatorType": "Tcxo",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311747589 ns [0, Main] (3561)       "dpll1588Instance": 1,  
+	
+	Starting RE PTP with external Linux stack...
+	RE PTP Software Release ID = 4.3.4.518632, Commit ID = 07229d8c4548eebfbdb068ff4fef304398b817ba
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311771089 ns [0, Main] (3561)       "tsDeviceAlignmentDisable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311838310 ns [0, Main] (3561)       "holdover":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311868750 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311890160 ns [0, Main] (3561)           "holdoverType": "HardwareEnhanced",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311910660 ns [0, Main] (3561)           "holdoverLossPhysicalOosEnable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311931371 ns [0, Main] (3561)           "holdoverTimeoutSeconds": 1000,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311952371 ns [0, Main] (3561)           "holdoverQualificationSeconds": 100,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 311973021 ns [0, Main] (3561)           "unqualifiedTimeoutSeconds": 10000,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 312000681 ns [0, Main] (3561)           "outOfSpecUserDefinedFrequencyOffsetEnable": 0,  
+	ptp4l[246.214]: master offset 1758720559867633424 s0 freq     +29 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645320335 ns [0, Main] (3561)           "outOfSpecUserDefinedFrequencyOffsetPpb": 0  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645351375 ns [0, Main] (3561)       }  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645372095 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645391976 ns [0, Main] (3561)   "profileConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645412456 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645432206 ns [0, Main] (3561)       "physicalPllClockCategory": 4,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645453016 ns [0, Main] (3561)       "physicalPllClockCategoryThreshold": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645473477 ns [0, Main] (3561)       "physicalPllInstance": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645493987 ns [0, Main] (3561)       "physicalPllWaitToRestoreTimeoutValue": 10  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645515087 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645534797 ns [0, Main] (3561)     
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645554397 ns [0, Main] (3561)   "loggerConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645573888 ns [0, Main] (3561)   {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645593058 ns [0, Main] (3561)       "stdoutLog":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645613458 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645633218 ns [0, Main] (3561)           "enable": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645653108 ns [0, Main] (3561)           "selectionMask": "0000000000011111",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645673819 ns [0, Main] (3561)           "_description_": "        | ||||||___ 0: Sync error                ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645696209 ns [0, Main] (3561)           "_description_": "        | |||||____ 1: Sync warning              ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645718899 ns [0, Main] (3561)           "_description_": "        | ||||_____ 2: Sync analysis             ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645740679 ns [0, Main] (3561)           "_description_": "        | |||______ 3: Error                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645762449 ns [0, Main] (3561)           "_description_": "        | ||_______ 4: Warning                   ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645784740 ns [0, Main] (3561)           "_description_": "        | |________ 5: Debug                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645806730 ns [0, Main] (3561)           "_description_": "        |__________ 7: Timestamp                 "  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645828780 ns [0, Main] (3561)       },  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645848480 ns [0, Main] (3561)         
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645868250 ns [0, Main] (3561)       "externalFdLog":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645888121 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645907301 ns [0, Main] (3561)           "enable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645927201 ns [0, Main] (3561)           "selectionMask": "0000000000011111",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645948121 ns [0, Main] (3561)           "_description_": "        | ||||||___ 0: Sync error                ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645970921 ns [0, Main] (3561)           "_description_": "        | |||||____ 1: Sync warning              ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 645992982 ns [0, Main] (3561)           "_description_": "        | ||||_____ 2: Sync analysis             ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 646014912 ns [0, Main] (3561)           "_description_": "        | |||______ 3: Error                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979319425 ns [0, Main] (3561)           "_description_": "        | ||_______ 4: Warning                   ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979344996 ns [0, Main] (3561)           "_description_": "        | |________ 5: Debug                     ",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979368676 ns [0, Main] (3561)           "_description_": "        |__________ 7: Timestamp                 "  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979390836 ns [0, Main] (3561)       }  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979410786 ns [0, Main] (3561)   },  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979429837 ns [0, Main] (3561)     
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979449827 ns [0, Main] (3561)   "instanceConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979469937 ns [0, Main] (3561)   [  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979489847 ns [0, Main] (3561)       {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979509637 ns [0, Main] (3561)           "correctionFieldEnable": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979530898 ns [0, Main] (3561)           "lostMasterTimeoutMilliseconds": 2000,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979552478 ns [0, Main] (3561)           "manageClockClassEnable": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979573238 ns [0, Main] (3561)           "manageClockClassExtendedEnable": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979594498 ns [0, Main] (3561)           "ptpDomainNumber": -1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979614818 ns [0, Main] (3561)           "numberOfTrackerInstances": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979635839 ns [0, Main] (3561)             
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979655599 ns [0, Main] (3561)           "trackerConfig":  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979675679 ns [0, Main] (3561)           {  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979695289 ns [0, Main] (3561)             "delayAsymmetryNanoseconds": 0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979716369 ns [0, Main] (3561)             "phaseSnapThresholdSeconds": 0.00001,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979737550 ns [0, Main] (3561)             "floorDelayEstimateSeconds": -1.0,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979758280 ns [0, Main] (3561)             "__timeLockThresholdNanoseconds": "Set to 200 to meet enhanced SyncE limits",  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979780610 ns [0, Main] (3561)             "timeLockThresholdNanoseconds": 580,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979801820 ns [0, Main] (3561)             "willCorrectFrequencyAtFirstSnap": 1,  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979822721 ns [0, Main] (3561)             "frequencyLockThresholdPpb": 16.0,   
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979843421 ns [0, Main] (3561)             "lockFilterWindowLengthSeconds": 1.0  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979864011 ns [0, Main] (3561)           }  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979884031 ns [0, Main] (3561)       }  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979903331 ns [0, Main] (3561)   ]  
+	RE::SyncAnalysis: 2025-09-24 13:33:55 979922292 ns [0, Main] (3561) }  
+	RE::Warning: 2025-09-24 13:33:55 979941292 ns [0, Main] (5060) ** Alert - the following values are non default:  
+	RE::Warning: 2025-09-24 13:33:55 979961842 ns [0, Main] (5060) ** referenceTrackerType = 2 **  
+	RE::Warning: 2025-09-24 13:33:55 979982342 ns [0, Main] (5060) ** phc4lConfig.dcoDevice = /dev/ptp0 **  
+	RE::Warning: 2025-09-24 13:33:55 980002752 ns [0, Main] (5060) ** phc4lConfig.phaseSnapDelaySeconds = 3 **  
+	RE::Warning: 2025-09-24 13:33:55 980023503 ns [0, Main] (5060) ** deviceConfig.oscillatorType = 0 **  
+	RE::Warning: 2025-09-24 13:33:55 980044053 ns [0, Main] (5060) ** deviceConfig.dpll1588Instance = 1 **  
+	RE::Warning: 2025-09-24 13:33:56 313414317 ns [0, Main] (5060) ** phc4lConfig.tsDevice[0] = /dev/ptp1 **  
+	RE::Warning: 2025-09-24 13:33:56 313438717 ns [0, Main] (5060) ** phc4lConfig.tsDeviceExttsCorrectionNs[0] = -434 **  
+	RE::Warning: 2025-09-24 13:33:56 313461157 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverType = 2 **  
+	RE::Warning: 2025-09-24 13:33:56 313482358 ns [0, Main] (5060) ** deviceConfig.holdoverConfig.holdoverTimeoutSeconds = 1000 **  
+	RE::Warning: 2025-09-24 13:33:56 313503748 ns [0, Main] (5060) ** profileConfig.physicalPllClockCategory = 4 **  
+	RE::Warning: 2025-09-24 13:33:56 313524828 ns [0, Main] (5060) ** profileConfig.physicalPllInstance = 0 **  
+	RE::Warning: 2025-09-24 13:33:56 313545618 ns [0, Main] (5060) ** The following non default reference tracker parameters are for stack instance 0 (each reference tracker configuration is identical) **  
+	RE::Warning: 2025-09-24 13:33:56 313569789 ns [0, Main] (5060) ** instanceConfig.trackerConfig.willCorrectFrequencyAtFirstSnap = 1 **  
+	RE::Warning: 2025-09-24 13:33:56 313591559 ns [0, Main] (5060) ** instanceConfig.trackerConfig.frequencyLockThresholdPpb = 16.000000 **  
+	RE::Warning: 2025-09-24 13:33:56 313613429 ns [0, Main] (5060) ** instanceConfig.trackerConfig.timeLockThresholdNanoseconds = 580.000000 **  
+	RE::SyncWarning: 2025-09-24 13:33:56 313646429 ns [0, Main] (2114) Stack instance 0, port 1 not enabled, skip profile checking  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 313682540 ns [0, Main] (3102) Configuring IDT Phc4l timestamper (/dev/ptp1).
+	
+	RE::SyncAnalysis: 2025-09-24 13:33:56 313712440 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> Start.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 313733640 ns [0, Main] (3579) QR: Qualified reference is not supported  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 313754300 ns [0, Main] (3004) RE PTP Software Release ID: 4.3.4.518632 & Commit ID: 07229d8c4548eebfbdb068ff4fef304398b817ba.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 313796841 ns [3, Supervisor] (3101) Configuring Phc4l device driver (/dev/ptp0).  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 313817851 ns [3, Supervisor] (3236) phc4l initialization: set initial FFO value to 0 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 918842382 ns [3, Supervisor] (3220) HW device configuration complete.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 918902363 ns [3, Supervisor] (3153) Clock category changed:  E_CATEGORY_INVALID (6) -> E_CATEGORY4 (4).  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 919312647 ns [3, Supervisor] (3562) Set combo mode Hold/Freeze  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 920221596 ns [3, Supervisor] (3521) Sync-e Supervisor state: Unqualified  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 920250226 ns [3, Supervisor] (3520) Sync-e Supervisor is started.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 920363667 ns [3, Supervisor] (3066) LO state: 'Initial' to 'Free Run'    Event: 'LO initialized'.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 920582150 ns [0, Main] (3252) Tracker run mode: 'Snapping'     3165.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 920865572 ns [3, Supervisor] (3225) Register tracker S0.Tracker#0: stack instance number 0; reference tracker instance number 0  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 921068244 ns [5, MngIf] (3049) Listening on IP Address 127.0.0.1 on port 2400.  
+	RE::SyncAnalysis: 2025-09-24 13:33:56 923081635 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestDefaultDataSet.  
+	
+	Stack instance 0 Default data set received:
+		twoStep:     1
+		clockId:     b2:92:11:ff:fe:bc:20:f1
+		ports:       1
+		clkClass:    255
+		clkAccur:    254
+		clkScldVar:  65535
+		prio1:       128
+		prio2:       255
+		domain:      44
+		slaveOnly:   1
+	RE::SyncAnalysis: 2025-09-24 13:33:57 035174806 ns [0, Main] (3279) CCM: disabled    (Initial clockClass: 255, JSON: manageClockClassEnable 1, manageClockClassExtendedEnable 0)  
+	RE::SyncAnalysis: 2025-09-24 13:33:57 038943543 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestParentDataSet.  
+	
+	Stack instance 0 Parent data set received:
+		parentPortId: d6:79:18:ff:fe:34:4d:1e.1
+		parentStats:   0
+		oposlv:        65535
+		opcpcr:        2147483647
+		gmPriority1:   128
+		gmPriority2:   255
+		clkClass:      248
+		clkAccur:      254
+		clkScldVar:    65535
+		gmClockId:     d6:79:18:ff:fe:34:4d:1e
+	RE::SyncAnalysis: 2025-09-24 13:33:57 050942033 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestTimePropertiesDataSet.  
+	
+	Stack instance 0 Time Properties data set received:
+		curUtcOffs:     37
+		tmSrc:          160
+		leap_61:        0
+		leap_59:        0
+		curUtcOffsVal:  0
+		ptpTmScale:     1
+		timeTraceable:  0
+		freqTraceable:  0
+	RE::SyncAnalysis: 2025-09-24 13:33:57 062941363 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> RequestClockDescription.  
+	
+	Stack instance 0 Clock Description 0 received:
+		clockType:           OC   
+		phyLayerProtocol:    IEEE 802.3
+		phyAddress:          B2: 92: 11: BC: 20: F1: 
+		protocolAddress:     IPv4:  192.168.1.100
+		manufacturer id:     000000
+		productDescription:  ;;
+		revision:            ;;
+		userDescription:     
+		profile id:          0019a7020102
+	RE::SyncAnalysis: 2025-09-24 13:33:57 075285077 ns [0, Main] (3221) Timestamper device eth1 is used by external Linux stack  
+	RE::SyncAnalysis: 2025-09-24 13:33:57 075334827 ns [0, Main] (3222) Instance 0: stack adaptor state transition --> Running.  
+	RE::SyncAnalysis: 2025-09-24 13:33:57 078974704 ns [3, Supervisor] (3280) Notified frequency traceability for stack instance 0: 0  
+	RE::SyncAnalysis: 2025-09-24 13:33:57 079021464 ns [0, Main] (3283) Inserted master information list node: actual d6:79:18:ff:fe:34:4d:1e.1; local stack b2:92:11:ff:fe:bc:20:f1.0  
+	RE::SyncAnalysis: 2025-09-24 13:33:57 079046214 ns [0, Main] (3268) Instance 0: d6:79:18:ff:fe:34:4d:1e.1 state transition --> WaitGetPortDataSet  
+	RE::Warning: 2025-09-24 13:33:57 142975984 ns [3, Supervisor] (5073) Target port number = 0, override to 1 - check PTP stack is sending non-zero port number when sending timestsamps  
+	RE::SyncAnalysis: 2025-09-24 13:33:57 147008894 ns [2, LinuxExtern] (3268) Instance 0: d6:79:18:ff:fe:34:4d:1e.1 state transition --> WaitTimestamps  
+	ptp4l[248.214]: master offset -37997937793 s0 freq +1000000001 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:33:57 920483880 ns [0, Main] (3524) Sync-e Supervisor: physical clock category changed to 4  
+	RE::SyncAnalysis: 2025-09-24 13:33:57 920546901 ns [0, Main] (3525) Sync-e Supervisor: physical clock category threshold changed to 1  
+	RE::SyncWarning: 2025-09-24 13:33:57 920571951 ns [0, Main] (2190) Sync-e Supervisor: physical clock category (4) does not meet the threshold (1)  
+	ptp4l[250.215]: master offset -37997937745 s0 freq     +24 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:34:01 270988500 ns [0, Main] (3268) Instance 0: d6:79:18:ff:fe:34:4d:1e.1 state transition --> UpdateMasterInfo  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 274950410 ns [0, Main] (3301) Set master timeout to 2000 ms for d6:79:18:ff:fe:34:4d:1e.1  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 274998951 ns [0, Main] (3275) Single path active: 0.  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 275020511 ns [0, Main] (3223) Measured sync interval is 62500 us for master d6:79:18:ff:fe:34:4d:1e.1  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 275043481 ns [0, Main] (3224) Measured delay request interval is 62500 us for master d6:79:18:ff:fe:34:4d:1e.1  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 275065901 ns [0, Main] (3268) Instance 0: d6:79:18:ff:fe:34:4d:1e.1 state transition --> Running  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 327022631 ns [3, Supervisor] (3258) Stack instance 0: Attempt to register new master d6:79:18:ff:fe:34:4d:1e.1  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 327071121 ns [3, Supervisor] (3260) Stack instance 0, tracker instance 0: Allocated new tracker S0.Tracker#0.  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 327093882 ns [3, Supervisor] (3125) Assign tracker S0.Tracker#0 to track d6:79:18:ff:fe:34:4d:1e.1  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 327123212 ns [3, Supervisor] (3126) S0.Tracker#0: New registered master d6:79:18:ff:fe:34:4d:1e.1 has clock class 0.  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 327156742 ns [4, S0.Tracker#0] (3276) processSinglePathInfo: Single path active = 0.  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 347059201 ns [0, Main] (3285) Best master changed from 00:00:00:00:00:00:00:00.0 to d6:79:18:ff:fe:34:4d:1e.1  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 347102582 ns [3, Supervisor] (3123) 1588 reference acquired, S0.Tracker#0 is the chosen tracker (d6:79:18:ff:fe:34:4d:1e.1)  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 347126552 ns [3, Supervisor] (3066) LO state: 'Free Run' to 'Lock Acquisition'    Event: 'LO reference acquired'.  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 349222213 ns [4, S0.Tracker#0 *] (3252) Tracker run mode: 'Snapping'     3164.  
+	ptp4l[252.216]: master offset -37997937692 s0 freq     +25 path delay       170
+	RE::SyncAnalysis: 2025-09-24 13:34:01 643833399 ns [3, Supervisor] (3109) Corrected: 0.000000 ppb from S0.Tracker#0    Total Aged: 0.000000 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 645840720 ns [4, S0.Tracker#0 *] (3204) snapSubStage: 'Initial' to 'Frequency Measurements'.  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 645875650 ns [4, S0.Tracker#0 *] (3240) offset: -37997937686.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 706994191 ns [4, S0.Tracker#0 *] (3240) offset: -37997937686.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 770993871 ns [4, S0.Tracker#0 *] (3240) offset: -37997937683.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 830992421 ns [4, S0.Tracker#0 *] (3240) offset: -37997937680.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 895006222 ns [4, S0.Tracker#0 *] (3240) offset: -37997937678.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:01 958994432 ns [4, S0.Tracker#0 *] (3240) offset: -37997937677.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 018996172 ns [4, S0.Tracker#0 *] (3240) offset: -37997937675.0 ns    delay: 175.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 082992642 ns [4, S0.Tracker#0 *] (3240) offset: -37997937672.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 142995182 ns [4, S0.Tracker#0 *] (3240) offset: -37997937670.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 206996012 ns [4, S0.Tracker#0 *] (3240) offset: -37997937667.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 270993792 ns [4, S0.Tracker#0 *] (3240) offset: -37997937664.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 330995062 ns [4, S0.Tracker#0 *] (3240) offset: -37997937662.0 ns    delay: 175.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 394994742 ns [4, S0.Tracker#0 *] (3240) offset: -37997937661.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 458996252 ns [4, S0.Tracker#0 *] (3240) offset: -37997937659.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 518994942 ns [4, S0.Tracker#0 *] (3240) offset: -37997937654.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 582995103 ns [4, S0.Tracker#0 *] (3240) offset: -37997937652.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 642994943 ns [4, S0.Tracker#0 *] (3240) offset: -37997937651.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 706995713 ns [4, S0.Tracker#0 *] (3240) offset: -37997937649.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 770996853 ns [4, S0.Tracker#0 *] (3240) offset: -37997937648.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 830995963 ns [4, S0.Tracker#0 *] (3240) offset: -37997937646.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 894995873 ns [4, S0.Tracker#0 *] (3240) offset: -37997937644.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:02 958998093 ns [4, S0.Tracker#0 *] (3240) offset: -37997937641.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 018995883 ns [4, S0.Tracker#0 *] (3240) offset: -37997937639.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 082994483 ns [4, S0.Tracker#0 *] (3240) offset: -37997937637.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 146994133 ns [4, S0.Tracker#0 *] (3240) offset: -37997937636.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 206994664 ns [4, S0.Tracker#0 *] (3240) offset: -37997937635.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 270996264 ns [4, S0.Tracker#0 *] (3240) offset: -37997937635.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 330995214 ns [4, S0.Tracker#0 *] (3240) offset: -37997937635.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 394994834 ns [4, S0.Tracker#0 *] (3240) offset: -37997937633.5 ns    delay: 174.5 ns  
+	ptp4l[254.217]: master offset -37997937632 s0 freq     +30 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:03 458996654 ns [4, S0.Tracker#0 *] (3240) offset: -37997937632.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 518994784 ns [4, S0.Tracker#0 *] (3240) offset: -37997937632.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 582996264 ns [4, S0.Tracker#0 *] (3240) offset: -37997937630.0 ns    delay: 175.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 646995104 ns [4, S0.Tracker#0 *] (3240) offset: -37997937630.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 706996324 ns [4, S0.Tracker#0 *] (3240) offset: -37997937626.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 770994514 ns [4, S0.Tracker#0 *] (3240) offset: -37997937625.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 830993124 ns [4, S0.Tracker#0 *] (3240) offset: -37997937623.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 894995025 ns [4, S0.Tracker#0 *] (3240) offset: -37997937622.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:03 958997915 ns [4, S0.Tracker#0 *] (3240) offset: -37997937619.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 018994625 ns [4, S0.Tracker#0 *] (3240) offset: -37997937617.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 083009165 ns [4, S0.Tracker#0 *] (3240) offset: -37997937617.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 146995065 ns [4, S0.Tracker#0 *] (3240) offset: -37997937614.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 206996095 ns [4, S0.Tracker#0 *] (3240) offset: -37997937609.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 270996035 ns [4, S0.Tracker#0 *] (3240) offset: -37997937607.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 331021706 ns [4, S0.Tracker#0 *] (3240) offset: -37997937606.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 394995305 ns [4, S0.Tracker#0 *] (3240) offset: -37997937605.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 458994345 ns [4, S0.Tracker#0 *] (3240) offset: -37997937602.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 518994346 ns [4, S0.Tracker#0 *] (3240) offset: -37997937601.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 582995826 ns [4, S0.Tracker#0 *] (3240) offset: -37997937598.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 646995876 ns [4, S0.Tracker#0 *] (3240) offset: -37997937597.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 706995096 ns [4, S0.Tracker#0 *] (3240) offset: -37997937593.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 770993816 ns [4, S0.Tracker#0 *] (3240) offset: -37997937591.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 834995206 ns [4, S0.Tracker#0 *] (3240) offset: -37997937590.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 894994616 ns [4, S0.Tracker#0 *] (3240) offset: -37997937587.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:04 958995976 ns [4, S0.Tracker#0 *] (3240) offset: -37997937585.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 018995036 ns [4, S0.Tracker#0 *] (3240) offset: -37997937582.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 082993776 ns [4, S0.Tracker#0 *] (3240) offset: -37997937582.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 146995597 ns [4, S0.Tracker#0 *] (3240) offset: -37997937581.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 207014627 ns [4, S0.Tracker#0 *] (3240) offset: -37997937577.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 270996767 ns [4, S0.Tracker#0 *] (3240) offset: -37997937576.0 ns    delay: 174.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 334994177 ns [4, S0.Tracker#0 *] (3240) offset: -37997937574.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 394993197 ns [4, S0.Tracker#0 *] (3240) offset: -37997937571.0 ns    delay: 173.0 ns  
+	ptp4l[256.218]: master offset -37997937570 s0 freq     +30 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:34:05 458998497 ns [4, S0.Tracker#0 *] (3240) offset: -37997937570.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 518995367 ns [4, S0.Tracker#0 *] (3240) offset: -37997937568.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 582996197 ns [4, S0.Tracker#0 *] (3240) offset: -37997937568.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 646995087 ns [4, S0.Tracker#0 *] (3240) offset: -37997937568.0 ns    delay: 172.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 706995197 ns [4, S0.Tracker#0 *] (3240) offset: -37997937565.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 770995878 ns [4, S0.Tracker#0 *] (3240) offset: -37997937565.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 834994838 ns [4, S0.Tracker#0 *] (3240) offset: -37997937561.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 894994708 ns [4, S0.Tracker#0 *] (3240) offset: -37997937559.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:05 959014068 ns [4, S0.Tracker#0 *] (3240) offset: -37997937558.0 ns    delay: 176.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 022997378 ns [4, S0.Tracker#0 *] (3240) offset: -37997937555.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 082996118 ns [4, S0.Tracker#0 *] (3240) offset: -37997937553.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 146995218 ns [4, S0.Tracker#0 *] (3240) offset: -37997937552.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 206994038 ns [4, S0.Tracker#0 *] (3240) offset: -37997937552.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 270996368 ns [4, S0.Tracker#0 *] (3240) offset: -37997937550.5 ns    delay: 174.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 335010539 ns [4, S0.Tracker#0 *] (3240) offset: -37997937548.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 394994378 ns [4, S0.Tracker#0 *] (3240) offset: -37997937547.0 ns    delay: 175.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 458995949 ns [4, S0.Tracker#0 *] (3240) offset: -37997937546.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 522993789 ns [4, S0.Tracker#0 *] (3240) offset: -37997937545.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 582995509 ns [4, S0.Tracker#0 *] (3240) offset: -37997937542.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 646988319 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 4.94 seconds.  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 647916558 ns [3, Supervisor] (3109) Corrected: -29.066569 ppb from S0.Tracker#0    Total Aged: -29.066569 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:34:06 649964359 ns [3, Supervisor] (3213) Sync time of day: +37.997937537 s  
+	ptp4l[258.218]: master offset        -29 s0 freq +949978997 path delay       174
+	ptp4l[260.219]: master offset        -31 s0 freq      -1 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:10 053614480 ns [3, Supervisor] (3121) Corrected: +37.997937537 s from S0.Tracker#0    Max FFO req/gnt: -1.000000 / -1.000000 ppb.  
+	RE::SyncAnalysis: 2025-09-24 13:34:11 147016686 ns [4, S0.Tracker#0 *] (3240) offset: -30.5 ns    delay: 171.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:11 210988136 ns [4, S0.Tracker#0 *] (3240) offset: -32.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:11 274985786 ns [4, S0.Tracker#0 *] (3240) offset: -35.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:11 334990176 ns [4, S0.Tracker#0 *] (3240) offset: -35.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:11 398985366 ns [4, S0.Tracker#0 *] (3240) offset: -35.0 ns    delay: 173.0 ns  
+	ptp4l[262.220]: master offset        -35 s0 freq      -2 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:11 458984766 ns [4, S0.Tracker#0 *] (3240) offset: -35.5 ns    delay: 172.5 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:11 522992746 ns [4, S0.Tracker#0 *] (3205) Frequency and ToD estimation finished. Estimation time: 0.38 seconds.  
+	RE::SyncAnalysis: 2025-09-24 13:34:11 523055787 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Snapping' to 'Converging'     3160.  
+	RE::SyncAnalysis: 2025-09-24 13:34:12 463018498 ns [4, S0.Tracker#0 *] (3240) offset: -16.0 ns    delay: 173.0 ns  
+	ptp4l[264.221]: master offset        -16 s0 freq     +10 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:13 463014780 ns [4, S0.Tracker#0 *] (3240) offset: -16.0 ns    delay: 173.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:34:13 775002210 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Converging' to 'Statistics Collecting'     3159.  
+	RE::SyncAnalysis: 2025-09-24 13:34:13 775406264 ns [3, Supervisor] (3066) LO state: 'Lock Acquisition' to 'Frequency Locked'    Event: 'LO frequency locked'.  
+	RE::SyncAnalysis: 2025-09-24 13:34:13 775519665 ns [3, Supervisor] (3066) LO state: 'Frequency Locked' to 'Time Locked'    Event: 'LO time locked'.  
+	ptp4l[264.596]: port 1 (eth1): UNCALIBRATED to SLAVE on MASTER_CLOCK_SELECTED
+	ptp4l[266.221]: master offset        -19 s2 freq      -1 path delay       171
+	ptp4l[268.222]: master offset        -24 s2 freq      -3 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:18 463037268 ns [4, S0.Tracker#0 *] (3240) offset: -22.0 ns    delay: 173.0 ns  
+	ptp4l[270.223]: master offset        -30 s2 freq      -3 path delay       171
+	ptp4l[272.224]: master offset        -26 s2 freq      +3 path delay       173
+	ptp4l[274.225]: master offset         -3 s2 freq     +11 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:23 467012985 ns [4, S0.Tracker#0 *] (3240) offset: -3.5 ns    delay: 173.5 ns  
+	ptp4l[276.225]: master offset          0 s2 freq      +1 path delay       173
+	ptp4l[278.226]: master offset        -22 s2 freq     -11 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:34:28 467022603 ns [4, S0.Tracker#0 *] (3240) offset: -16.0 ns    delay: 173.0 ns  
+	ptp4l[280.227]: master offset        -13 s2 freq      +5 path delay       173
+	ptp4l[282.228]: master offset          0 s2 freq      +6 path delay       173
+	ptp4l[284.228]: master offset         12 s2 freq      +5 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:34:33 471016931 ns [4, S0.Tracker#0 *] (3240) offset: 11.5 ns    delay: 171.5 ns  
+	ptp4l[286.229]: master offset          4 s2 freq      -3 path delay       171
+	ptp4l[288.230]: master offset          5 s2 freq      +0 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:34:38 471044019 ns [4, S0.Tracker#0 *] (3240) offset: 0.0 ns    delay: 172.0 ns  
+	ptp4l[290.231]: master offset        -17 s2 freq     -11 path delay       173
+	ptp4l[292.232]: master offset         -7 s2 freq      +6 path delay       173
+	ptp4l[294.233]: master offset         -6 s2 freq      +0 path delay       174
+	RE::SyncAnalysis: 2025-09-24 13:34:43 475018367 ns [4, S0.Tracker#0 *] (3240) offset: -6.5 ns    delay: 172.5 ns  
+	ptp4l[296.234]: master offset         -3 s2 freq      +2 path delay       173
+	ptp4l[298.234]: master offset         -6 s2 freq      -1 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:48 475027604 ns [4, S0.Tracker#0 *] (3240) offset: -24.0 ns    delay: 171.0 ns  
+	ptp4l[300.235]: master offset        -24 s2 freq     -10 path delay       171
+	ptp4l[302.236]: master offset        -22 s2 freq      +2 path delay       173
+	ptp4l[304.237]: master offset        -16 s2 freq      +3 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:34:53 479014212 ns [4, S0.Tracker#0 *] (3240) offset: -16.0 ns    delay: 173.0 ns  
+	ptp4l[306.238]: master offset        -17 s2 freq      -1 path delay       171
+	ptp4l[308.238]: master offset         -2 s2 freq      +7 path delay       171
+	RE::SyncAnalysis: 2025-09-24 13:34:58 479022670 ns [4, S0.Tracker#0 *] (3240) offset: -1.5 ns    delay: 171.5 ns  
+	ptp4l[310.239]: master offset        -15 s2 freq      -6 path delay       174
+	ptp4l[312.240]: master offset        -19 s2 freq      -1 path delay       173
+	ptp4l[314.241]: master offset         -6 s2 freq      +6 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:35:03 483013998 ns [4, S0.Tracker#0 *] (3240) offset: -6.5 ns    delay: 172.5 ns  
+	ptp4l[316.242]: master offset        -19 s2 freq      -6 path delay       172
+	ptp4l[318.242]: master offset        -11 s2 freq      +3 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:35:08 483020236 ns [4, S0.Tracker#0 *] (3240) offset: -21.0 ns    delay: 174.0 ns  
+	ptp4l[320.243]: master offset         -9 s2 freq      +2 path delay       173
+	ptp4l[322.244]: master offset        -10 s2 freq      -0 path delay       171
+	ptp4l[324.245]: master offset         -8 s2 freq      +0 path delay       173
+	RE::SyncAnalysis: 2025-09-24 13:35:13 487014473 ns [4, S0.Tracker#0 *] (3240) offset: -8.0 ns    delay: 171.0 ns  
+	RE::SyncAnalysis: 2025-09-24 13:35:13 858987444 ns [4, S0.Tracker#0 *] (3253) Tracker run mode: 'Statistics Collecting' to 'Tracking'     3163.  
+	ptp4l[326.245]: master offset        -12 s2 freq      -1 path delay       171
+	ptp4l[328.246]: master offset         -7 s2 freq      +3 path delay       172
+	ptp4l[330.247]: master offset         -4 s2 freq      +0 path delay       171
+	ptp4l[332.248]: master offset        -19 s2 freq      -6 path delay       173
+	ptp4l[334.249]: master offset        -17 s2 freq      +1 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:35:23 491015549 ns [4, S0.Tracker#0 *] (3240) offset: -17.5 ns    delay: 174.5 ns  
+	ptp4l[336.249]: master offset         -6 s2 freq      +5 path delay       172
+	ptp4l[338.250]: master offset        -13 s2 freq      -3 path delay       173
+	ptp4l[340.251]: master offset        -16 s2 freq      -1 path delay       173
+	ptp4l[342.252]: master offset        -25 s2 freq      -5 path delay       172
+	ptp4l[344.252]: master offset          2 s2 freq     +14 path delay       174
+	RE::SyncAnalysis: 2025-09-24 13:35:33 495020725 ns [4, S0.Tracker#0 *] (3240) offset: 1.5 ns    delay: 174.5 ns  
+	ptp4l[346.253]: master offset         13 s2 freq      +4 path delay       172
+	ptp4l[348.254]: master offset          8 s2 freq      -3 path delay       173
+	ptp4l[350.255]: master offset         -3 s2 freq      -4 path delay       172
+	ptp4l[352.256]: master offset          6 s2 freq      +4 path delay       173
+	ptp4l[354.256]: master offset          0 s2 freq      -3 path delay       172
+	RE::SyncAnalysis: 2025-09-24 13:35:43 499019220 ns [4, S0.Tracker#0 *] (3240) offset: 0.0 ns    delay: 173.0 ns  
 </details>
 
 >* **Note:** *`LO state: 'Frequency Locked' to 'Time Locked'    Event: 'LO time locked'`* in pcm4l log indicates both the frequency and phase of the local oscillator are aligned with the reference clock.
